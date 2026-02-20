@@ -29,3 +29,31 @@ services:
     command: ["status"]
     stdin_open: true
     tty: true
+
+  nanobot-daemon:
+    container_name: nanobot-daemon
+    <<: *common-config
+    command: ["daemon", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  caddy:
+    image: caddy:alpine
+    container_name: caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ~/.caddy/data:/data
+      - ~/.caddy/config:/config
+    depends_on:
+      - nanobot-daemon

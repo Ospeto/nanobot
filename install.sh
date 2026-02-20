@@ -101,7 +101,7 @@ if [[ -n "$LLM_API_KEY" ]]; then
   },
   "providers": {
     "$PROVIDER_KEY": {
-      "api_key": "$LLM_API_KEY"
+      "apiKey": "$LLM_API_KEY"
     }
   }
 }
