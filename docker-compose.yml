@@ -5,6 +5,8 @@ x-common-config: &common-config
   volumes:
     - ~/.nanobot:/root/.nanobot
     - ~/.digimon:/root/.digimon
+  env_file:
+    - .env
 
 services:
   nanobot-gateway:

@@ -82,6 +82,10 @@ esac
 echo -e "\n${YELLOW}Would you like to enable Web Search capabilities? (Requires Brave Search API)${NC}"
 read -p "Enter your Brave Search API Key (Leave blank to skip): " BRAVE_API_KEY
 
+# Notion Integration (Optional Task Sync)
+echo -e "\n${YELLOW}Would you like to enable Notion Task Sync for Digimon stats?${NC}"
+read -p "Enter your Notion Internal Integration Secret (Leave blank to skip): " NOTION_API_KEY
+
 # 2. Write Configurations
 
 echo -e "\n${BLUE}=======================================${NC}"
@@ -90,6 +94,9 @@ echo -e "${YELLOW}Step 2: Writing Configuration Files${NC}"
 # Write .env file
 echo "ENV=prod" > .env
 echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_TOKEN" >> .env
+if [[ -n "$NOTION_API_KEY" ]]; then
+    echo "NOTION_API_KEY=$NOTION_API_KEY" >> .env
+fi
 echo "Wrote .env"
 
 # Write Caddyfile
