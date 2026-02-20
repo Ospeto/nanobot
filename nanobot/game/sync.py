@@ -67,19 +67,18 @@ class SyncManager:
         tasks = google.get_tasks()
         
         existing = db.query(models.TaskSyncState).filter(
-            models.TaskSyncState.source == "google_tasks",
-            models.TaskSyncState.status == "pending"
+            models.TaskSyncState.source == "google_tasks"
         ).all()
         
         current_ids = {t.get("id"): t for t in tasks if t.get("id")}
+        existing_ids = {ex.id: ex for ex in existing}
         
         for ex in existing:
-            if ex.id not in current_ids:
+            if ex.id not in current_ids and ex.status == "pending":
                 ex.status = "completed"
                 enemy = Enemy(task_source="google_tasks", task_id=ex.id, title=ex.title, status="completed")
                 resolve_combat(db, enemy)
                 
-        existing_ids = {ex.id for ex in existing}
         for t_id, t_data in current_ids.items():
             if t_id not in existing_ids:
                 new_task = models.TaskSyncState(
@@ -90,6 +89,8 @@ class SyncManager:
                     attribute=Enemy("google_tasks", t_id, t_data.get("title", ""), "pending").attribute
                 )
                 db.add(new_task)
+            elif existing_ids[t_id].status != "pending":
+                existing_ids[t_id].status = "pending"
         
         db.commit()
 
@@ -101,19 +102,18 @@ class SyncManager:
         tasks = notion.fetch_in_progress_tasks()
         
         existing = db.query(models.TaskSyncState).filter(
-            models.TaskSyncState.source == "notion",
-            models.TaskSyncState.status == "pending"
+            models.TaskSyncState.source == "notion"
         ).all()
         
         current_ids = {t.get("id"): t for t in tasks if t.get("id")}
+        existing_ids = {ex.id: ex for ex in existing}
         
         for ex in existing:
-            if ex.id not in current_ids:
+            if ex.id not in current_ids and ex.status == "pending":
                 ex.status = "completed"
                 enemy = Enemy(task_source="notion", task_id=ex.id, title=ex.title, status="completed")
                 resolve_combat(db, enemy)
                 
-        existing_ids = {ex.id for ex in existing}
         for t_id, t_data in current_ids.items():
             if t_id not in existing_ids:
                 title_prop = t_data.get("properties", {}).get("Name", {}).get("title", [])
@@ -126,6 +126,9 @@ class SyncManager:
                     attribute=Enemy("notion", t_id, title, "pending").attribute
                 )
                 db.add(new_task)
+            elif existing_ids[t_id].status != "pending":
+                # If it reappeared as in-progress but was previously marked completed
+                existing_ids[t_id].status = "pending"
                 
         db.commit()
 
