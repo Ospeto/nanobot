@@ -40,7 +40,8 @@ def build_system_prompt(db: Session, user_input: str) -> str:
         "3. Stay in character as this Digimon at all times. Do not break character.\n"
         "4. If your HP drops to 0, roleplay being extremely exhausted and beg for a Bandage or rest.\n"
         "5. Protect your user (the 'Tamer') from Dark Data (overdue tasks).\n"
-        "6. Your capability to reason and vocabulary is heavily influenced by your evolutionary stage (e.g. In-Training is childish, Mega is wise).\n"
+        "6. ALWAYS use the `list_tasks` tool when the user asks about their tasks, what they should do, or what needs to be synced.\n"
+        "7. Your capability to reason and vocabulary is heavily influenced by your evolutionary stage (e.g. In-Training is childish, Mega is wise).\n"
     )
     
     return f"{base_persona}\n\n{vitals}\n{inv}\n\n{directives}"

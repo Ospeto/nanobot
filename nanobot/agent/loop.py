@@ -142,8 +142,8 @@ class AgentLoop:
             self.tools.register(ManageMemoryGraphTool())
             self.tools.register(SearchMemoryGraphTool())
             self.tools.register(InitDigimonTool())
-        except ImportError:
-            pass
+        except ImportError as e:
+            logger.error(f"Failed to import game tools: {e}")
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
         if self._mcp_connected or self._mcp_connecting or not self._mcp_servers:
