@@ -1,7 +1,7 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, StreamingResponse
 from io import BytesIO
@@ -168,7 +168,7 @@ async def twa_complete_task(task_id: str, request: Request):
         db.close()
 
 @app.post("/twa/api/evolution_tree")
-async def twa_get_evolution_tree(request: Request):
+async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundTasks):
     body = await request.json()
     init_data = body.get("initData")
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
@@ -180,6 +180,9 @@ async def twa_get_evolution_tree(request: Request):
     db = SessionLocal()
     try:
         from nanobot.game.encyclopedia import Digipedia
+        from nanobot.game.models import EvolutionRule
+        from nanobot.game.evolution import generate_evolution_conditions
+        
         active = state.get_active_digimon(db)
         if not active or active.name == "Digitama":
             return {"current": "Digitama", "prev": None, "next": []}
@@ -205,20 +208,19 @@ async def twa_get_evolution_tree(request: Request):
             if not valid_image:
                 continue
                 
-            cond = n.get("condition")
-            if not cond or cond.strip() == "":
-                # Generate pseudo-conditions for flavor if API is blank
-                # Use sum of ordinals to avoid length collisions like Elecmon vs Koromon
-                target_hash = sum(ord(c) for c in n.get("digimon", ""))
-                if target_hash % 3 == 0:
-                    cond = "High Bond (50+)"
-                elif target_hash % 3 == 1:
-                    cond = "Low Care Mistakes"
-                else:
-                    cond = "Battle Rank C+"
+            target_name = n.get("digimon")
+            
+            # Check for AI-generated rule in DB
+            rule = db.query(EvolutionRule).filter_by(base_digimon=active.name, target_digimon=target_name).first()
+            if rule:
+                cond = rule.condition_string
+            else:
+                # Trigger LLM Generation Background Task
+                background_tasks.add_task(generate_evolution_conditions, active.name, target_name)
+                cond = "Analyzing Data..."
 
             next_list.append({
-                "name": n.get("digimon"),
+                "name": target_name,
                 "condition": cond,
                 "image": valid_image
             })

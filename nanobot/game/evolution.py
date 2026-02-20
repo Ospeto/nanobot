@@ -1,6 +1,66 @@
 from sqlalchemy.orm import Session
 from . import state
 from .encyclopedia import Digipedia
+from nanobot.game.models import EvolutionRule
+from nanobot.game.database import SessionLocal
+from nanobot.config.loader import load_config
+from nanobot.cli.commands import _make_provider
+
+async def generate_evolution_conditions(base_name: str, target_name: str) -> None:
+    db = SessionLocal()
+    try:
+        # Prevent race condition duplicates
+        rule = db.query(EvolutionRule).filter_by(base_digimon=base_name, target_digimon=target_name).first()
+        if rule:
+            return
+            
+        config = load_config()
+        provider = _make_provider(config)
+        prompt = f"""You are a specialized game designer for a Digimon Virtual Pet simulation.
+Your task is to generate exactly 1 concise evolution requirement for evolving '{base_name}' into '{target_name}'.
+You must choose from one or a combination of the following virtual pet game mechanics:
+- Care Mistakes (e.g., "0-2 Care Mistakes")
+- Bond/Affection (e.g., "High Bond 50+")
+- Battles Won (e.g., "5+ Battles Won")
+- Weight (e.g., "Weight > 20g")
+
+Do not write any introductory or wrap-up text. Return ONLY the condition string itself. Limit to 30 characters maximum!
+Example: "High Bond & 0 Care Mistakes"
+"""
+        response = await provider.chat([{"role": "user", "content": prompt}], max_tokens=50)
+        
+        condition_string = response.content.strip().strip('"\'')
+        if len(condition_string) > 40:
+            condition_string = condition_string[:37] + "..."
+            
+        new_rule = EvolutionRule(
+            base_digimon=base_name,
+            target_digimon=target_name,
+            condition_string=condition_string
+        )
+        db.add(new_rule)
+        db.commit()
+    except Exception as e:
+        import traceback
+        print(f"LLM Generation failed for {target_name}, using fallback heuristics. ({e})")
+        
+        target_hash = sum(ord(c) for c in target_name)
+        if target_hash % 3 == 0:
+            condition_string = "High Bond (50+)"
+        elif target_hash % 3 == 1:
+            condition_string = "Low Care Mistakes"
+        else:
+            condition_string = "Battle Rank C+"
+            
+        new_rule = EvolutionRule(
+            base_digimon=base_name,
+            target_digimon=target_name,
+            condition_string=condition_string
+        )
+        db.add(new_rule)
+        db.commit()
+    finally:
+        db.close()
 
 async def check_evolution_ready(db: Session) -> dict:
     digi = state.get_active_digimon(db)

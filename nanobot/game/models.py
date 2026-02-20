@@ -86,3 +86,12 @@ class SecondBrainDimension(Base):
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
+
+class EvolutionRule(Base):
+    __tablename__ = "evolution_rules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    base_digimon = Column(String, nullable=False, index=True)
+    target_digimon = Column(String, nullable=False, index=True)
+    condition_string = Column(String, nullable=False)
+    created_at = Column(String, default=lambda: datetime.utcnow().isoformat())
