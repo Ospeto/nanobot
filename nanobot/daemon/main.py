@@ -208,10 +208,11 @@ async def twa_get_evolution_tree(request: Request):
             cond = n.get("condition")
             if not cond or cond.strip() == "":
                 # Generate pseudo-conditions for flavor if API is blank
-                target_len = len(n.get("digimon", ""))
-                if target_len % 3 == 0:
+                # Use sum of ordinals to avoid length collisions like Elecmon vs Koromon
+                target_hash = sum(ord(c) for c in n.get("digimon", ""))
+                if target_hash % 3 == 0:
                     cond = "High Bond (50+)"
-                elif target_len % 3 == 1:
+                elif target_hash % 3 == 1:
                     cond = "Low Care Mistakes"
                 else:
                     cond = "Battle Rank C+"
