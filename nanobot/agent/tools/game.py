@@ -154,10 +154,10 @@ class ListTasksTool(Tool):
             "properties": {
                 "source_filter": {
                     "type": "string",
-                    "description": "Optional: Filter by 'notion' or 'google_tasks'. Leave empty to get all tasks."
+                    "description": "Required: Filter by 'notion' or 'google_tasks' or 'all'."
                 }
             },
-            "required": []
+            "required": ["source_filter"]
         }
         
     async def execute(self, source_filter: str | None = None, **kwargs) -> str:
@@ -167,8 +167,9 @@ class ListTasksTool(Tool):
         try:
             from nanobot.game import models
             query = db.query(models.TaskSyncState).filter(models.TaskSyncState.status == "pending")
-            if source_filter:
-                query = query.filter(models.TaskSyncState.source == source_filter)
+            if source_filter and source_filter.lower() != "all":
+                safeguard_filter = "google_tasks" if "google" in source_filter.lower() else source_filter.lower()
+                query = query.filter(models.TaskSyncState.source == safeguard_filter)
             
             tasks = query.all()
             if not tasks:
