@@ -78,6 +78,10 @@ case $LLM_CHOICE in
         ;;
 esac
 
+# Brave Search (Optional Web Capability)
+echo -e "\n${YELLOW}Would you like to enable Web Search capabilities? (Requires Brave Search API)${NC}"
+read -p "Enter your Brave Search API Key (Leave blank to skip): " BRAVE_API_KEY
+
 # 2. Write Configurations
 
 echo -e "\n${BLUE}=======================================${NC}"
@@ -117,7 +121,14 @@ if [[ -n "$LLM_API_KEY" ]]; then
       "token": "$TELEGRAM_TOKEN",
       "allowFrom": ["$TELEGRAM_USER_ID"]
     }
-  }
+  }$(if [[ -n "$BRAVE_API_KEY" ]]; then echo ",
+  \"tools\": {
+    \"web\": {
+      \"search\": {
+        \"apiKey\": \"$BRAVE_API_KEY\"
+      }
+    }
+  }"; fi)
 }
 EOF
     echo "Wrote ~/.nanobot/config.json"
@@ -130,7 +141,14 @@ else
       "token": "$TELEGRAM_TOKEN",
       "allowFrom": ["$TELEGRAM_USER_ID"]
     }
-  }
+  }$(if [[ -n "$BRAVE_API_KEY" ]]; then echo ",
+  \"tools\": {
+    \"web\": {
+      \"search\": {
+        \"apiKey\": \"$BRAVE_API_KEY\"
+      }
+    }
+  }"; fi)
 }
 EOF
     echo "Wrote ~/.nanobot/config.json (without AI keys)"
