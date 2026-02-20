@@ -22,3 +22,4 @@ botpy.log
 tests/
 Caddyfile
 *.log
+auth_google.py

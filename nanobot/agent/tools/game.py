@@ -137,3 +137,35 @@ class PlayTool(Tool):
             return f"You played with {digi.name}! Bond increased to {digi.bond}. Energy is now {digi.energy}/100 and Hunger is {digi.hunger}/100."
         finally:
             db.close()
+
+class ListTasksTool(Tool):
+    @property
+    def name(self) -> str:
+        return "list_tasks"
+        
+    @property
+    def description(self) -> str:
+        return "List all pending tasks synchronized from Google Tasks or Notion. This tells you what the human needs to complete, so your Digimon character can aggressively encourage them to do it."
+        
+    @property
+    def parameters(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+        
+    async def execute(self, **kwargs) -> str:
+        if not HAS_GAME:
+            return "Game module not available."
+        db = SessionLocal()
+        try:
+            from nanobot.game import models
+            tasks = db.query(models.TaskSyncState).filter(models.TaskSyncState.status == "pending").all()
+            if not tasks:
+                return "You have ZERO pending tasks! Good job! Tell the user they are completely clear."
+                
+            task_list = "\\n".join([f"- {t.title} ({t.source})" for t in tasks])
+            return f"PENDING TASKS:\\n{task_list}\\n\\nTell the human they need to finish these to gain EXP and Food!"
+        finally:
+            db.close()
