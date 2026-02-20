@@ -1,264 +1,438 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Digivice Partner</title>
-    <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bg-color: #1a1a2e;
-            --text-color: #e0e0e0;
-            --primary: #0f3460;
-            --secondary: #e94560;
-            --accent: #16213e;
-            --nav-bg: #111;
+        * {
+            box-sizing: border-box;
+            user-select: none;
         }
+
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Courier New', Courier, monospace; /* Retro feel */
-            background-color: var(--TelegramButtonColor, var(--bg-color));
-            color: var(--TelegramTextColor, var(--text-color));
+            background-color: #031518;
             display: flex;
             flex-direction: column;
+            justify-content: center;
+            align-items: center;
             height: 100vh;
             overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
         }
-        /* HUD */
-        #hud {
-            padding: 10px;
-            background: var(--nav-bg);
-            border-bottom: 2px solid var(--secondary);
-            display: flex;
-            justify-content: space-between;
-        }
-        .vitals {
-            font-size: 0.9em;
-        }
-        .vital-bar {
-            width: 100px;
-            height: 10px;
-            background: #333;
-            border-radius: 5px;
-            overflow: hidden;
-            display: inline-block;
-            margin-left: 5px;
-            vertical-align: middle;
-        }
-        .vital-fill {
-            height: 100%;
-            background: #4caf50;
-            transition: width 0.3s ease;
-        }
-        /* Content Area */
-        #content {
-            flex-grow: 1;
-            overflow-y: auto;
-            position: relative;
-        }
-        .tab-content {
-            display: none;
-            height: 100%;
-            padding: 15px;
-            box-sizing: border-box;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        
-        /* Enclosure (Home) */
-        #home-tab {
-            background: #8fbc8f; /* grass like */
-            position: relative;
-        }
-        #enclosure {
+
+        /* Digital World Background */
+        .digital-world {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
+            inset: 0;
+            overflow: hidden;
+            z-index: -2;
+            perspective: 800px;
+        }
+
+        .digital-grid {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: linear-gradient(rgba(0, 255, 255, 0.15) 2px, transparent 2px), linear-gradient(90deg, rgba(0, 255, 255, 0.15) 2px, transparent 2px);
+            background-size: 80px 80px;
+            transform: rotateX(60deg);
+            animation: gridMove 10s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: rotateX(60deg) translateY(0);
+            }
+
+            100% {
+                transform: rotateX(60deg) translateY(80px);
+            }
+        }
+
+        .cube {
+            position: absolute;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            animation: floatCube linear infinite;
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2), 0 0 10px rgba(0, 255, 255, 0.4);
+        }
+
+        @keyframes floatCube {
+            0% {
+                transform: translateY(100vh) rotate(0deg) scale(0.5);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-50vh) rotate(360deg) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .hardware-wrapper {
+            position: relative;
+            width: 95vw;
+            max-width: 600px;
+            aspect-ratio: 1 / 1;
+            /* Match the exact aspect ratio of the PNG */
             display: flex;
             justify-content: center;
             align-items: center;
-        }
-        .pixel-digimon {
-            width: 64px;
-            height: 64px;
-            background-color: orange;
-            border-radius: 10px;
-            animation: bounce 1s infinite alternate;
-            transition: transform 0.2s;
-        }
-        @keyframes bounce {
-            from { transform: translateY(0); }
-            to { transform: translateY(-10px); }
+            filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.8));
+            z-index: 10;
         }
 
-        /* Navigation Bar */
-        #bottom-nav {
-            display: flex;
-            background: var(--nav-bg);
-            border-top: 2px solid var(--secondary);
-            height: 60px;
+        /* The literal PNG render of the 3D model */
+        .img-casing {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            pointer-events: none;
+            object-fit: contain;
         }
+
+        /* Invisible click hotspots mapped to the exact position of the 3D model buttons */
+        .hw-btn {
+            position: absolute;
+            background: transparent;
+            z-index: 10;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+
+        .hw-btn:active {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Dim the actual 3D button underneath slightly */
+
+        /* Approximate physical mapping coordinates for the rendered PNG (needs fine-tuning) */
+        .btn-left {
+            left: 9%;
+            top: 38%;
+            width: 20%;
+            height: 24%;
+            border-radius: 50%;
+        }
+
+        .btn-right-top {
+            right: 8%;
+            top: 33%;
+            width: 14%;
+            height: 12%;
+            border-radius: 30px;
+        }
+
+        .btn-right-bot {
+            right: 8%;
+            top: 56%;
+            width: 14%;
+            height: 12%;
+            border-radius: 30px;
+        }
+
+        /* DOM LCD screen positioned perfectly into the 3D model's screen hole */
+        .lcd-display {
+            position: absolute;
+            left: 33%;
+            top: 33%;
+            width: 34%;
+            height: 34%;
+            background-color: #799a80;
+            border-radius: 4px;
+            box-shadow: inset 3px 3px 12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 2px solid #111;
+            color: #1a2e24;
+            z-index: 5;
+            font-size: 0.85rem;
+            font-weight: 800;
+        }
+
+        .lcd-display::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 2px, rgba(0, 10, 0, 0.08) 3px, rgba(0, 10, 0, 0.12) 5px);
+        }
+
+        .view-layer {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 4px;
+            box-sizing: border-box;
+            background: inherit;
+        }
+
+        .view-layer.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .lcd-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #1a2e24;
+            padding-bottom: 2px;
+            margin-bottom: 3px;
+            font-size: 0.75em;
+            z-index: 5;
+            flex-shrink: 0;
+        }
+
+        .sprite-wrapper {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .sprite-img {
+            width: 100%;
+            max-width: 110px;
+            height: auto;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+            filter: contrast(1.5) sepia(0.5);
+            animation: idleBounce 1.5s infinite alternate steps(2);
+        }
+
+        @keyframes idleBounce {
+            0% {
+                transform: translateY(2px);
+            }
+
+            100% {
+                transform: translateY(-2px);
+            }
+        }
+
+        .vitals-box {
+            position: absolute;
+            bottom: 1px;
+            left: 1px;
+            font-size: 0.55em;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            z-index: 5;
+        }
+
+        .vital-line {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            width: 42px;
+        }
+
+        .vital-bar {
+            width: 28px;
+            height: 4px;
+            border: 1px solid #1a2e24;
+        }
+
+        .vital-fill {
+            height: 100%;
+            background-color: #1a2e24;
+            transition: width 0.3s;
+        }
+
+        .menu-list {
+            font-size: 0.65em;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .menu-item {
+            border: 1px dotted #1a2e24;
+            padding: 2px;
+            margin-bottom: 2px;
+            cursor: pointer;
+        }
+
+        .menu-item:active {
+            background-color: #1a2e24;
+            color: #799a80;
+        }
+
+        .software-nav {
+            margin-top: 20px;
+            display: flex;
+            gap: 8px;
+            width: 95vw;
+            max-width: 500px;
+            justify-content: space-between;
+            z-index: 20;
+        }
+
         .nav-btn {
             flex: 1;
-            background: none;
-            border: none;
-            color: white;
-            font-family: inherit;
-            font-size: 0.9em;
+            background: rgba(11, 55, 69, 0.8);
+            backdrop-filter: blur(5px);
+            color: #4fc3cd;
+            border: 2px solid #4fc3cd;
+            border-radius: 8px;
+            padding: 12px 0;
+            font-weight: bold;
+            font-size: 0.85rem;
             cursor: pointer;
-            transition: background 0.2s;
+            text-align: center;
         }
-        .nav-btn:active, .nav-btn.active {
-            background: var(--primary);
-        }
-        button {
-            background: var(--primary);
-            color: white;
-            border: 1px solid var(--secondary);
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: inherit;
-        }
-        button:active {
-            background: var(--secondary);
-        }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+
+        .nav-btn.active {
+            background: #4fc3cd;
+            color: #031518;
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(79, 195, 205, 0.6);
         }
     </style>
 </head>
+
 <body>
+    <div class="digital-world" id="bg-world">
+        <div class="digital-grid"></div>
+    </div>
 
-    <div id="hud">
-        <div>
-            <div><strong><span id="digi-name">Loading...</span></strong> [Lv <span id="digi-level">?</span>]</div>
-            <div>Bits: <span id="bits-count">0</span></div>
-        </div>
-        <div class="vitals">
-            <div>HP <div class="vital-bar"><div class="vital-fill" id="hp-bar" style="width: 100%;"></div></div></div>
-            <div>EN <div class="vital-bar"><div class="vital-fill" id="en-bar" style="width: 100%; background: #2196f3;"></div></div></div>
-            <div>HG <div class="vital-bar"><div class="vital-fill" id="hg-bar" style="width: 100%; background: #ff9800;"></div></div></div>
+    <div class="hardware-wrapper">
+        <!-- Rendered PNG image of the exact Digivice Portable 3D model! -->
+        <img class="img-casing" src="/static/digivice_proper.png" alt="Digivice Render" />
+
+        <!-- Invisible button hotspots -->
+        <div class="hw-btn btn-left" onclick="cycleMenu()"></div>
+        <div class="hw-btn btn-right-top" onclick="triggerAction('interact', 'feed')"></div>
+        <div class="hw-btn btn-right-bot" onclick="triggerAction('interact', 'pet')"></div>
+
+        <!-- DOM LCD precisely overlaid inside the rendered inner rim -->
+        <div class="lcd-display">
+            <div class="lcd-header">
+                <span id="digi-name">WAIT..</span>
+                <span>L<span id="digi-level">?</span></span>
+            </div>
+            <div id="home-view" class="view-layer active">
+                <div class="sprite-wrapper">
+                    <img src="" id="sprite-img" class="sprite-img" alt="Digimon" style="display:none;"
+                        onerror="this.style.display='none'">
+                    <div class="vitals-box">
+                        <div class="vital-line">HP <div class="vital-bar">
+                                <div class="vital-fill" id="hp-bar" style="width:100%;"></div>
+                            </div>
+                        </div>
+                        <div class="vital-line">EN <div class="vital-bar">
+                                <div class="vital-fill" id="en-bar" style="width:100%;"></div>
+                            </div>
+                        </div>
+                        <div class="vital-line">HG <div class="vital-bar">
+                                <div class="vital-fill" id="hg-bar" style="width:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="quests-view" class="view-layer">
+                <div style="text-align:center; border-bottom:1px dotted #1a2e24;">TARGETS</div>
+                <div class="menu-list" id="task-list">
+                    <div class="menu-item">[!] SCANNING</div>
+                </div>
+            </div>
+            <div id="evo-view" class="view-layer">
+                <div style="text-align:center; border-bottom:1px dotted #1a2e24;">EVOLUTION</div>
+                <div class="menu-list" style="text-align:center;">
+                    <div style="font-size:1.1em;margin-top:2px;"><span id="current-evo">ROOKIE</span></div>
+                    <div style="margin-top:5px;">REQUIREMENTS<br>LOCKED</div>
+                </div>
+            </div>
+            <div id="shop-view" class="view-layer">
+                <div style="text-align:center; border-bottom:1px dotted #1a2e24;"><span id="bits-count">0</span> BITS
+                </div>
+                <div class="menu-list">
+                    <div class="menu-item" onclick="triggerAction('shop','meat')">MEAT - 50B</div>
+                    <div class="menu-item" onclick="triggerAction('shop','pill')">PILL - 30B</div>
+                    <div class="menu-item" onclick="triggerAction('shop','x-anti')">X-ANTI- 5K</div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="content">
-        <!-- Home / Enclosure Tab -->
-        <div id="home-tab" class="tab-content active">
-            <div id="enclosure">
-                <div class="pixel-digimon" id="sprite"></div>
-            </div>
-            <!-- Actions -->
-            <div style="position: absolute; bottom: 20px; left: 10px; right: 10px; display: flex; justify-content: space-around;">
-                <button onclick="interact('feed')">🍖 Feed</button>
-                <button onclick="interact('heal')">💊 Heal</button>
-                <button onclick="interact('pet')">👋 Pet</button>
-            </div>
-        </div>
-
-        <!-- Quests Tab -->
-        <div id="quests-tab" class="tab-content" style="background: var(--bg-color);">
-            <h2>Active Targets</h2>
-            <div id="task-list" style="color: var(--text-color);">
-                <p>Syncing Dark Data anomalies...</p>
-                <ul style="list-style-type: none; padding: 0;">
-                    <li style="background: #333; margin: 5px 0; padding: 10px; border-left: 4px solid var(--secondary);">
-                        [Virus] Finish Project Report
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- Training / Evolution Tab -->
-        <div id="evo-tab" class="tab-content" style="background: var(--bg-color); color: var(--text-color);">
-            <h2>Evolution Tree</h2>
-            <p>Current: <strong id="current-evo" style="color: var(--secondary);">Rookie</strong></p>
-            <div style="border: 1px dashed #666; padding: 15px; text-align: center; border-radius: 5px;">
-                <p>Next possible: Greymon, Tyrannomon</p>
-                <button disabled>Conditions Not Met</button>
-            </div>
-        </div>
-
-        <!-- Shop Tab -->
-        <div id="shop-tab" class="tab-content" style="background: var(--bg-color); color: var(--text-color);">
-            <h2>Reward Center</h2>
-            <p>Spend Bits to support your partner.</p>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="buy('X-Antibody')">🧬 X-Antibody (5000b)</button>
-                <button onclick="buy('Sirloin')">🥩 Sirloin (50b)</button>
-                <button onclick="buy('Bandage')">🩹 Bandage (30b)</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="bottom-nav">
-        <button class="nav-btn active" onclick="switchTab('home')">🏠 Home</button>
-        <button class="nav-btn" onclick="switchTab('quests')">⚔️ Quests</button>
-        <button class="nav-btn" onclick="switchTab('evo')">🧬 Evo</button>
-        <button class="nav-btn" onclick="switchTab('shop')">🛒 Shop</button>
+    <!-- Fallback App Navigation -->
+    <div class="software-nav">
+        <div class="nav-btn active" onclick="switchView('home',this)">HOME</div>
+        <div class="nav-btn" onclick="switchView('quests',this)">QUEST</div>
+        <div class="nav-btn" onclick="switchView('evo',this)">EVO</div>
+        <div class="nav-btn" onclick="switchView('shop',this)">SHOP</div>
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            
-            document.getElementById(tabId + '-tab').classList.add('active');
-            event.currentTarget.classList.add('active');
+        const tg = window.Telegram.WebApp; tg.expand(); tg.ready();
+        const bg = document.getElementById('bg-world');
+        for (let i = 0; i < 12; i++) {
+            const c = document.createElement('div'); c.className = 'cube';
+            c.style.left = Math.random() * 100 + 'vw'; c.style.width = c.style.height = (Math.random() * 40 + 15) + 'px';
+            c.style.animationDuration = (Math.random() * 8 + 5) + 's'; c.style.animationDelay = (Math.random() * 5) + 's';
+            bg.appendChild(c);
         }
-
+        const views = ['home', 'quests', 'evo', 'shop']; let ci = 0;
+        function switchView(id, btn) {
+            ci = views.indexOf(id);
+            document.querySelectorAll('.view-layer').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id + '-view').classList.add('active');
+            if (btn) btn.classList.add('active');
+            else { const b = document.querySelectorAll('.nav-btn'); if (b[ci]) b[ci].classList.add('active'); }
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        function cycleMenu() { ci = (ci + 1) % views.length; switchView(views[ci]); }
         async function fetchVitals() {
             try {
-                const res = await fetch('/twa/api/vitals', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ initData: tg.initData })
-                });
-                if(res.ok) {
-                    const data = await res.json();
-                    document.getElementById('digi-name').innerText = data.active_digimon.name;
-                    document.getElementById('digi-level').innerText = data.active_digimon.level;
-                    
-                    document.getElementById('hp-bar').style.width = data.active_digimon.hp + '%';
-                    document.getElementById('en-bar').style.width = data.active_digimon.energy + '%';
-                    document.getElementById('hg-bar').style.width = data.active_digimon.hunger + '%';
-                }
-            } catch (e) {
-                console.error("Failed to fetch vitals", e);
-            }
-        }
-
-        function interact(action) {
-            const sprite = document.getElementById('sprite');
-            sprite.style.transform = 'scale(1.2)';
-            setTimeout(() => { sprite.style.transform = ''; }, 200);
-            
-            if (tg.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('light');
-            }
-        }
-
-        function buy(item) {
-            if (tg.showConfirm) {
-                tg.showConfirm(`Buy ${item}?`, (confirmed) => {
-                    if(confirmed) {
-                        tg.showAlert("Purchased!");
+                const res = await fetch('/twa/api/vitals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData || "dummy" }) });
+                if (res.ok) {
+                    const d = await res.json();
+                    document.getElementById('digi-name').innerText = d.active_digimon.name.substring(0, 8).toUpperCase();
+                    document.getElementById('digi-level').innerText = d.active_digimon.level;
+                    document.getElementById('hp-bar').style.width = d.active_digimon.hp + '%';
+                    document.getElementById('en-bar').style.width = d.active_digimon.energy + '%';
+                    document.getElementById('hg-bar').style.width = d.active_digimon.hunger + '%';
+                    document.getElementById('bits-count').innerText = d.active_digimon.bits || 0;
+                    if (d.active_digimon.sprite) {
+                        const img = document.getElementById('sprite-img');
+                        img.src = d.active_digimon.sprite.replace('/twa/api/sprite/', 'https://digi-api.com/images/digimon/w/') + ".png";
+                        img.style.display = 'block';
                     }
-                });
-            } else {
-                alert(`Purchased ${item}`);
-            }
+                }
+            } catch (e) { }
         }
-
-        // Init
-        fetchVitals();
+        function triggerAction(type, action) {
+            const img = document.getElementById('sprite-img');
+            img.style.transform = 'scale(1.3) rotate(-8deg)'; setTimeout(() => { img.style.transform = ''; }, 200);
+            if (type === 'shop') { if (tg.showConfirm) { tg.showConfirm(`Buy ${action}?`, c => { if (c) tg.showAlert('Bought!'); }); } else alert('Bought ' + action + '!'); }
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        }
+        fetchVitals(); setInterval(fetchVitals, 60000);
     </script>
 </body>
+
 </html>

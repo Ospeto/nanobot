@@ -123,6 +123,18 @@ class AgentLoop:
         # Cron tool (for scheduling)
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
+            
+        # Game tools (for Digimon companion)
+        try:
+            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool
+            from nanobot.agent.tools.second_brain import AddMemoryNodeTool, LinkMemoryNodesTool
+            self.tools.register(FeedTool())
+            self.tools.register(HealTool())
+            self.tools.register(PlayTool())
+            self.tools.register(AddMemoryNodeTool())
+            self.tools.register(LinkMemoryNodesTool())
+        except ImportError:
+            pass
     
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -343,7 +355,7 @@ class AgentLoop:
             asyncio.create_task(_consolidate_and_unlock())
 
         self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
-        initial_messages = self.context.build_messages(
+        initial_messages = await self.context.build_messages(
             history=session.get_history(max_messages=self.memory_window),
             current_message=msg.content,
             media=msg.media if msg.media else None,
@@ -401,7 +413,7 @@ class AgentLoop:
         session_key = f"{origin_channel}:{origin_chat_id}"
         session = self.sessions.get_or_create(session_key)
         self._set_tool_context(origin_channel, origin_chat_id, msg.metadata.get("message_id"))
-        initial_messages = self.context.build_messages(
+        initial_messages = await self.context.build_messages(
             history=session.get_history(max_messages=self.memory_window),
             current_message=msg.content,
             channel=origin_channel,
