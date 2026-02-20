@@ -22,6 +22,13 @@ while [[ -z "$TELEGRAM_TOKEN" ]]; do
     read -p "Enter your Telegram Bot Token: " TELEGRAM_TOKEN
 done
 
+# Telegram User ID
+read -p "Enter your Telegram User ID (numbers only, no @): " TELEGRAM_USER_ID
+while [[ -z "$TELEGRAM_USER_ID" ]]; do
+    echo "Telegram User ID is required to authorize commands."
+    read -p "Enter your Telegram User ID (numbers only, no @): " TELEGRAM_USER_ID
+done
+
 # Domain Name
 echo -e "\n${YELLOW}To run the Web App, Caddy needs a domain name for SSL generation.${NC}"
 echo "If you are running this locally without a domain, press Enter to default to 'localhost'."
@@ -103,12 +110,30 @@ if [[ -n "$LLM_API_KEY" ]]; then
     "$PROVIDER_KEY": {
       "apiKey": "$LLM_API_KEY"
     }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "$TELEGRAM_TOKEN",
+      "allowFrom": ["$TELEGRAM_USER_ID"]
+    }
   }
 }
 EOF
     echo "Wrote ~/.nanobot/config.json"
 else
-    echo "Skipping ~/.nanobot/config.json - No AI Key provided."
+    cat > ~/.nanobot/config.json << EOF
+{
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "$TELEGRAM_TOKEN",
+      "allowFrom": ["$TELEGRAM_USER_ID"]
+    }
+  }
+}
+EOF
+    echo "Wrote ~/.nanobot/config.json (without AI keys)"
 fi
 
 
