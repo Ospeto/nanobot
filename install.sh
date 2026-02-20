@@ -33,8 +33,9 @@ echo -e "\n${YELLOW}Which AI Provider do you want to use?${NC}"
 echo "1) OpenRouter (Recommended)"
 echo "2) OpenAI"
 echo "3) Anthropic"
-echo "4) None (Not recommended, Evolutions will use fallback math)"
-read -p "Select [1-4]: " LLM_CHOICE
+echo "4) Gemini"
+echo "5) None (Not recommended, Evolutions will use fallback math)"
+read -p "Select [1-5]: " LLM_CHOICE
 
 PROVIDER_KEY="openrouter"
 MODEL_NAME="openrouter/anthropic/claude-3.5-sonnet:beta"
@@ -56,6 +57,12 @@ case $LLM_CHOICE in
         read -p "Enter your Anthropic API Key: " LLM_API_KEY
         ;;
     4)
+        PROVIDER_KEY="gemini"
+        # Using LiteLLM's prefix standard
+        MODEL_NAME="gemini/gemini-2.5-flash"
+        read -p "Enter your Gemini API Key: " LLM_API_KEY
+        ;;
+    5)
         LLM_API_KEY=""
         ;;
     *)
