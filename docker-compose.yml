@@ -5,6 +5,7 @@ x-common-config: &common-config
   volumes:
     - ~/.nanobot:/root/.nanobot
     - ~/.digimon:/root/.digimon
+    - ~/.config/notion:/root/.config/notion
     - .:/app
   env_file:
     - .env
