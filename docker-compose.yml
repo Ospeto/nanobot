@@ -4,12 +4,13 @@ x-common-config: &common-config
     dockerfile: Dockerfile
   volumes:
     - ~/.nanobot:/root/.nanobot
+    - ~/.digimon:/root/.digimon
 
 services:
   nanobot-gateway:
     container_name: nanobot-gateway
     <<: *common-config
-    command: ["gateway"]
+    command: [ "gateway" ]
     restart: unless-stopped
     ports:
       - 18790:18790
@@ -21,19 +22,19 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-  
+
   nanobot-cli:
     <<: *common-config
     profiles:
       - cli
-    command: ["status"]
+    command: [ "status" ]
     stdin_open: true
     tty: true
 
   nanobot-daemon:
     container_name: nanobot-daemon
     <<: *common-config
-    command: ["daemon", "--host", "0.0.0.0", "--port", "8000"]
+    command: [ "daemon", "--host", "0.0.0.0", "--port", "8000" ]
     restart: unless-stopped
     deploy:
       resources:
