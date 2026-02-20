@@ -42,3 +42,29 @@ class NotionIntegration:
         except Exception as e:
             print(f"Error fetching Notion Tasks: {e}")
             return []
+
+    def complete_task(self, page_id: str) -> bool:
+        if not self.is_authenticated():
+            return False
+            
+        url = f"https://api.notion.com/v1/pages/{page_id}"
+        payload = {
+            "properties": {
+                "Status": {
+                    "status": {
+                        "name": "Done"
+                    }
+                }
+            }
+        }
+        try:
+            response = requests.patch(url, json=payload, headers=self.headers)
+            if response.status_code != 200:
+                # Try fallback for 'select' type property instead of 'status'
+                payload["properties"]["Status"] = {"select": {"name": "Done"}}
+                response = requests.patch(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            print(f"Error completing Notion Task {page_id}: {e}")
+            return False

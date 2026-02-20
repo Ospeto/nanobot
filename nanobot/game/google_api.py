@@ -54,6 +54,26 @@ class GoogleIntegration:
             print(f"Error fetching Google Tasks: {e}")
             return []
 
+    def complete_task(self, task_id: str) -> bool:
+        if not self.authenticate():
+            return False
+            
+        try:
+            service = build('tasks', 'v1', credentials=self.creds, cache_discovery=False)
+            results = service.tasklists().list(maxResults=10).execute()
+            items = results.get('items', [])
+            if not items:
+                return False
+                
+            tasklist_id = items[0]['id']
+            task = service.tasks().get(tasklist=tasklist_id, task=task_id).execute()
+            task['status'] = 'completed'
+            service.tasks().update(tasklist=tasklist_id, task=task_id, body=task).execute()
+            return True
+        except Exception as e:
+            print(f"Error completing Google Task {task_id}: {e}")
+            return False
+
     def get_upcoming_events(self):
         if not self.authenticate():
             return []

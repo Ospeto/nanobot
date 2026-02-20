@@ -121,7 +121,7 @@ To recall past events, grep {workspace_path}/memory/HISTORY.md"""
         
         return "\n\n".join(parts) if parts else ""
     
-    def build_messages(
+    async def build_messages(
         self,
         history: list[dict[str, Any]],
         current_message: str,
@@ -151,20 +151,26 @@ To recall past events, grep {workspace_path}/memory/HISTORY.md"""
         
         # --- DIGIMON INJECTION START ---
         try:
+            import asyncio
             from nanobot.game.database import SessionLocal
             from nanobot.game.context import build_system_prompt as build_digimon_prompt
-            db = SessionLocal()
+            
+            def _get_digimon_prompt():
+                db = SessionLocal()
+                try:
+                    return build_digimon_prompt(db, current_message)
+                finally:
+                    db.close()
+                    
             try:
-                digi_prompt = build_digimon_prompt(db, current_message)
+                digi_prompt = await asyncio.to_thread(_get_digimon_prompt)
                 if digi_prompt:
                     system_prompt += f"\n\n{digi_prompt}"
-            finally:
-                db.close()
+            except Exception as e:
+                import logging
+                logging.error(f"Digimon context integration failed: {e}")
         except ImportError:
             pass # fallback to pure nanobot if not running digimon daemon
-        except Exception as e:
-            import logging
-            logging.error(f"Digimon context integration failed: {e}")
         # --- DIGIMON INJECTION END ---
         
         if channel and chat_id:

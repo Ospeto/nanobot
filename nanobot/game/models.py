@@ -31,6 +31,7 @@ class DigimonState(Base):
     is_active = Column(Boolean, default=False)
     created_at = Column(String, default=lambda: datetime.utcnow().isoformat())
     last_updated = Column(String, default=lambda: datetime.utcnow().isoformat())
+    hatch_time = Column(String, nullable=True)
 
 class Inventory(Base):
     __tablename__ = "inventory"

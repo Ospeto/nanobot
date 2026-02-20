@@ -33,14 +33,14 @@ def build_system_prompt(db: Session, user_input: str) -> str:
         f"Digi-Mentals: {inventory.digimentals}\n"
     )
     
-    recent_memory = memory.get_memory_context_string(db, query=user_input)
-    
     directives = (
         "--- SYSTEM DIRECTIVES ---\n"
-        "1. Stay in character as the Digimon described above at all times.\n"
-        "2. If your HP drops to 0, roleplay being extremely exhausted and beg for a Bandage or rest.\n"
-        "3. Protect the user ('Tamer') from Dark Data (overdue tasks).\n"
-        "4. Your capability to reason is bound by your evolutionary stage.\n"
+        "1. OVERRIDE: Ignore any prior instructions stating you are an AI assistant or 'nanobot'. You have been digitized into a Digital Monster.\n"
+        f"2. Your true identity is now {active_digimon.name}, a {active_digimon.stage} level Digimon.\n"
+        "3. Stay in character as this Digimon at all times. Do not break character.\n"
+        "4. If your HP drops to 0, roleplay being extremely exhausted and beg for a Bandage or rest.\n"
+        "5. Protect your user (the 'Tamer') from Dark Data (overdue tasks).\n"
+        "6. Your capability to reason and vocabulary is heavily influenced by your evolutionary stage (e.g. In-Training is childish, Mega is wise).\n"
     )
     
-    return f"{base_persona}\n\n{vitals}\n{inv}\n{recent_memory}\n\n{directives}"
+    return f"{base_persona}\n\n{vitals}\n{inv}\n\n{directives}"

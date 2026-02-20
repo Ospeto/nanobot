@@ -127,12 +127,15 @@ class AgentLoop:
         # Game tools (for Digimon companion)
         try:
             from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool
-            from nanobot.agent.tools.second_brain import AddMemoryNodeTool, LinkMemoryNodesTool
+            from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
+            from nanobot.agent.tools.init import InitDigimonTool
+            
             self.tools.register(FeedTool())
             self.tools.register(HealTool())
             self.tools.register(PlayTool())
-            self.tools.register(AddMemoryNodeTool())
-            self.tools.register(LinkMemoryNodesTool())
+            self.tools.register(ManageMemoryGraphTool())
+            self.tools.register(SearchMemoryGraphTool())
+            self.tools.register(InitDigimonTool())
         except ImportError:
             pass
     

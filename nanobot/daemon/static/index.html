@@ -23,6 +23,7 @@
             height: 100vh;
             overflow: hidden;
             font-family: 'Courier New', Courier, monospace;
+            color: #fff;
         }
 
         /* Digital World Background */
@@ -88,15 +89,30 @@
             width: 95vw;
             max-width: 600px;
             aspect-ratio: 1 / 1;
-            /* Match the exact aspect ratio of the PNG */
             display: flex;
             justify-content: center;
             align-items: center;
-            filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.8));
             z-index: 10;
+            animation: floatDevice 4s ease-in-out infinite;
         }
 
-        /* The literal PNG render of the 3D model */
+        @keyframes floatDevice {
+            0% {
+                transform: translateY(0px);
+                filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.8));
+            }
+
+            50% {
+                transform: translateY(-15px);
+                filter: drop-shadow(0 45px 50px rgba(0, 0, 0, 0.5));
+            }
+
+            100% {
+                transform: translateY(0px);
+                filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.8));
+            }
+        }
+
         .img-casing {
             width: 100%;
             height: 100%;
@@ -108,7 +124,6 @@
             object-fit: contain;
         }
 
-        /* Invisible click hotspots mapped to the exact position of the 3D model buttons */
         .hw-btn {
             position: absolute;
             background: transparent;
@@ -122,9 +137,6 @@
             background: rgba(0, 0, 0, 0.3);
         }
 
-        /* Dim the actual 3D button underneath slightly */
-
-        /* Approximate physical mapping coordinates for the rendered PNG (needs fine-tuning) */
         .btn-left {
             left: 9%;
             top: 38%;
@@ -149,23 +161,23 @@
             border-radius: 30px;
         }
 
-        /* DOM LCD screen positioned perfectly into the 3D model's screen hole */
+        /* DOM LCD properly covering the background blue gap */
         .lcd-display {
             position: absolute;
-            left: 33%;
-            top: 33%;
-            width: 34%;
-            height: 34%;
+            left: 31%;
+            top: 31%;
+            width: 38%;
+            height: 38%;
             background-color: #799a80;
-            border-radius: 4px;
-            box-shadow: inset 3px 3px 12px rgba(0, 0, 0, 0.5);
+            border-radius: 6px;
+            box-shadow: inset 4px 4px 15px rgba(0, 0, 0, 0.6);
             display: flex;
             flex-direction: column;
             overflow: hidden;
             border: 2px solid #111;
             color: #1a2e24;
             z-index: 5;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             font-weight: 800;
         }
 
@@ -178,20 +190,6 @@
             background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 2px, rgba(0, 10, 0, 0.08) 3px, rgba(0, 10, 0, 0.12) 5px);
         }
 
-        .view-layer {
-            display: none;
-            width: 100%;
-            height: 100%;
-            padding: 4px;
-            box-sizing: border-box;
-            background: inherit;
-        }
-
-        .view-layer.active {
-            display: flex;
-            flex-direction: column;
-        }
-
         .lcd-header {
             display: flex;
             justify-content: space-between;
@@ -199,7 +197,8 @@
             border-bottom: 2px solid #1a2e24;
             padding-bottom: 2px;
             margin-bottom: 3px;
-            font-size: 0.75em;
+            padding: 4px;
+            font-size: 0.85em;
             z-index: 5;
             flex-shrink: 0;
         }
@@ -210,11 +209,13 @@
             justify-content: center;
             align-items: center;
             position: relative;
+            padding: 4px;
         }
 
+        /* Sprite upscaling */
         .sprite-img {
             width: 100%;
-            max-width: 110px;
+            max-width: 150px;
             height: auto;
             object-fit: contain;
             mix-blend-mode: multiply;
@@ -232,27 +233,66 @@
             }
         }
 
+        @keyframes hatchShake {
+            0% {
+                transform: translate(1px, 1px) rotate(0deg);
+            }
+
+            25% {
+                transform: translate(-1px, -2px) rotate(-2deg);
+            }
+
+            50% {
+                transform: translate(-2px, 0px) rotate(2deg);
+            }
+
+            75% {
+                transform: translate(2px, 2px) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(1px, -1px) rotate(-2deg);
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(79, 195, 205, 0.6);
+            }
+
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 0 25px rgba(79, 195, 205, 1);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 15px rgba(79, 195, 205, 0.6);
+            }
+        }
+
         .vitals-box {
             position: absolute;
-            bottom: 1px;
-            left: 1px;
-            font-size: 0.55em;
+            bottom: 4px;
+            left: 4px;
+            font-size: 0.65em;
             display: flex;
             flex-direction: column;
-            gap: 1px;
+            gap: 2px;
             z-index: 5;
         }
 
         .vital-line {
             display: flex;
             align-items: center;
-            gap: 2px;
-            width: 42px;
+            gap: 4px;
+            width: 50px;
         }
 
         .vital-bar {
-            width: 28px;
-            height: 4px;
+            width: 34px;
+            height: 5px;
             border: 1px solid #1a2e24;
         }
 
@@ -262,26 +302,9 @@
             transition: width 0.3s;
         }
 
-        .menu-list {
-            font-size: 0.65em;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-
-        .menu-item {
-            border: 1px dotted #1a2e24;
-            padding: 2px;
-            margin-bottom: 2px;
-            cursor: pointer;
-        }
-
-        .menu-item:active {
-            background-color: #1a2e24;
-            color: #799a80;
-        }
-
+        /* Navigation */
         .software-nav {
-            margin-top: 20px;
+            margin-top: 25px;
             display: flex;
             gap: 8px;
             width: 95vw;
@@ -297,11 +320,17 @@
             color: #4fc3cd;
             border: 2px solid #4fc3cd;
             border-radius: 8px;
-            padding: 12px 0;
+            padding: 14px 0;
             font-weight: bold;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             cursor: pointer;
             text-align: center;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .nav-btn:active {
+            transform: scale(0.95);
         }
 
         .nav-btn.active {
@@ -309,6 +338,136 @@
             color: #031518;
             border-color: #fff;
             box-shadow: 0 0 15px rgba(79, 195, 205, 0.6);
+        }
+
+        /* --- THEMED FULLSCREEN MODALS --- */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 21, 24, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            flex-grow: 1;
+            border: 2px solid #4fc3cd;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(11, 55, 69, 0.9), rgba(3, 21, 24, 0.95));
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.15), inset 0 0 20px rgba(0, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 2px, rgba(79, 195, 205, 0.03) 3px, rgba(79, 195, 205, 0.05) 4px);
+            pointer-events: none;
+        }
+
+        .modal-header {
+            background: rgba(79, 195, 205, 0.15);
+            border-bottom: 1px solid #4fc3cd;
+            padding: 15px 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #4fc3cd;
+            text-shadow: 0 0 8px rgba(79, 195, 205, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #4fc3cd;
+            font-size: 1.5rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .modal-body {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+            color: #aae0e5;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        /* Specific Modal Layouts */
+        .quest-list,
+        .shop-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .cyber-item {
+            border: 1px solid rgba(79, 195, 205, 0.3);
+            background: rgba(79, 195, 205, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cyber-item:hover,
+        .cyber-item:active {
+            background: rgba(79, 195, 205, 0.2);
+            border-color: #4fc3cd;
+        }
+
+        .cyber-btn {
+            background: #4fc3cd;
+            color: #031518;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-family: inherit;
+        }
+
+        .evo-tree {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .evo-node {
+            padding: 10px;
+            border: 2px dashed #4fc3cd;
+            border-radius: 12px;
+            margin: auto;
+            text-align: center;
+            background: rgba(79, 195, 205, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 100px;
+            font-size: 1.1rem;
         }
     </style>
 </head>
@@ -319,99 +478,323 @@
     </div>
 
     <div class="hardware-wrapper">
-        <!-- Rendered PNG image of the exact Digivice Portable 3D model! -->
         <img class="img-casing" src="/static/digivice_proper.png" alt="Digivice Render" />
 
-        <!-- Invisible button hotspots -->
-        <div class="hw-btn btn-left" onclick="cycleMenu()"></div>
-        <div class="hw-btn btn-right-top" onclick="triggerAction('interact', 'feed')"></div>
-        <div class="hw-btn btn-right-bot" onclick="triggerAction('interact', 'pet')"></div>
+        <div class="hw-btn btn-left" onclick="lcdCycleMenu()"></div>
+        <div class="hw-btn btn-right-top" onclick="lcdSelect()"></div>
+        <div class="hw-btn btn-right-bot" onclick="lcdCancel()"></div>
 
-        <!-- DOM LCD precisely overlaid inside the rendered inner rim -->
         <div class="lcd-display">
             <div class="lcd-header">
                 <span id="digi-name">WAIT..</span>
                 <span>L<span id="digi-level">?</span></span>
             </div>
-            <div id="home-view" class="view-layer active">
-                <div class="sprite-wrapper">
-                    <img src="" id="sprite-img" class="sprite-img" alt="Digimon" style="display:none;"
-                        onerror="this.style.display='none'">
-                    <div class="vitals-box">
-                        <div class="vital-line">HP <div class="vital-bar">
-                                <div class="vital-fill" id="hp-bar" style="width:100%;"></div>
-                            </div>
+
+            <div class="sprite-wrapper">
+                <img src="" id="sprite-img" class="sprite-img" alt="Digimon" style="display:none;">
+
+                <!-- IDLE VITALS -->
+                <div class="vitals-box" id="lcd-vitals">
+                    <div class="vital-line">HP <div class="vital-bar">
+                            <div class="vital-fill" id="hp-bar" style="width:100%;"></div>
                         </div>
-                        <div class="vital-line">EN <div class="vital-bar">
-                                <div class="vital-fill" id="en-bar" style="width:100%;"></div>
-                            </div>
+                    </div>
+                    <div class="vital-line">EN <div class="vital-bar">
+                            <div class="vital-fill" id="en-bar" style="width:100%;"></div>
                         </div>
-                        <div class="vital-line">HG <div class="vital-bar">
-                                <div class="vital-fill" id="hg-bar" style="width:100%;"></div>
-                            </div>
+                    </div>
+                    <div class="vital-line">HG <div class="vital-bar">
+                            <div class="vital-fill" id="hg-bar" style="width:100%;"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div id="quests-view" class="view-layer">
-                <div style="text-align:center; border-bottom:1px dotted #1a2e24;">TARGETS</div>
-                <div class="menu-list" id="task-list">
-                    <div class="menu-item">[!] SCANNING</div>
+
+                <!-- MENU BAR -->
+                <div class="lcd-menu-bar" id="lcd-menu-bar"
+                    style="display: none; position: absolute; bottom: 4px; width: 100%; text-align: center; font-size: 1.1em; letter-spacing: 1px;">
+                    ◄ <span id="lcd-menu-text">FEED</span> ►
+                </div>
+
+                <!-- POMODORO VIEW -->
+                <div id="lcd-pomodoro"
+                    style="display: none; position: absolute; bottom: 4px; width: 100%; text-align: center; font-size: 1.2em;">
+                    <span id="pomo-time">25:00</span>
                 </div>
             </div>
-            <div id="evo-view" class="view-layer">
-                <div style="text-align:center; border-bottom:1px dotted #1a2e24;">EVOLUTION</div>
-                <div class="menu-list" style="text-align:center;">
-                    <div style="font-size:1.1em;margin-top:2px;"><span id="current-evo">ROOKIE</span></div>
-                    <div style="margin-top:5px;">REQUIREMENTS<br>LOCKED</div>
+            <div class="vital-line">HG <div class="vital-bar">
+                    <div class="vital-fill" id="hg-bar" style="width:100%;"></div>
                 </div>
             </div>
-            <div id="shop-view" class="view-layer">
-                <div style="text-align:center; border-bottom:1px dotted #1a2e24;"><span id="bits-count">0</span> BITS
+        </div>
+    </div>
+    </div>
+    </div>
+
+    <!-- Software App Navigation (bottom row) -->
+    <div class="software-nav" id="software-nav">
+        <div class="nav-btn active" onclick="closeModals()">HOME</div>
+        <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
+        <div class="nav-btn" onclick="openModal('evo')">EVO</div>
+        <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
+    </div>
+
+    <!-- Themed Full-Screen Overlays -->
+    <div id="quest-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// ENCRYPTION TARGETS</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body quest-list">
+                <div class="cyber-item">
+                    <div>
+                        <strong>[!] FIREWALL SCAN</strong>
+                        <div style="font-size:0.8em; opacity:0.8; margin-top:5px;">Hack into the D-Terminal.</div>
+                    </div>
+                    <button class="cyber-btn" onclick="triggerAction('quest', 'scan')">EXEC</button>
                 </div>
-                <div class="menu-list">
-                    <div class="menu-item" onclick="triggerAction('shop','meat')">MEAT - 50B</div>
-                    <div class="menu-item" onclick="triggerAction('shop','pill')">PILL - 30B</div>
-                    <div class="menu-item" onclick="triggerAction('shop','x-anti')">X-ANTI- 5K</div>
+                <!-- Placeholder for dynamic quests -->
+            </div>
+        </div>
+    </div>
+
+    <div id="evo-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// EVOLUTION TREE</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body evo-tree" id="evo-tree-container">
+                <!-- Dynamically populated via fetchEvoTree() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="shop-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// BLACK MARKET</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body shop-list">
+                <div style="margin-bottom: 15px; color: #fff; text-align: right;">CREDITS: <strong
+                        id="bits-count">0</strong></div>
+                <div class="cyber-item" onclick="triggerAction('shop', 'meat')">
+                    <span>DIGI-MEAT</span>
+                    <strong style="color:#fff;">50 ₿</strong>
+                </div>
+                <div class="cyber-item" onclick="triggerAction('shop', 'pill')">
+                    <span>RECOVERY PILL</span>
+                    <strong style="color:#fff;">30 ₿</strong>
+                </div>
+                <div class="cyber-item" onclick="triggerAction('shop', 'x-anti')">
+                    <span>X-ANTIBODY</span>
+                    <strong style="color:#fff;">5000 ₿</strong>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Fallback App Navigation -->
-    <div class="software-nav">
-        <div class="nav-btn active" onclick="switchView('home',this)">HOME</div>
-        <div class="nav-btn" onclick="switchView('quests',this)">QUEST</div>
-        <div class="nav-btn" onclick="switchView('evo',this)">EVO</div>
-        <div class="nav-btn" onclick="switchView('shop',this)">SHOP</div>
-    </div>
-
     <script>
-        const tg = window.Telegram.WebApp; tg.expand(); tg.ready();
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // Setup background cubes
         const bg = document.getElementById('bg-world');
         for (let i = 0; i < 12; i++) {
             const c = document.createElement('div'); c.className = 'cube';
-            c.style.left = Math.random() * 100 + 'vw'; c.style.width = c.style.height = (Math.random() * 40 + 15) + 'px';
-            c.style.animationDuration = (Math.random() * 8 + 5) + 's'; c.style.animationDelay = (Math.random() * 5) + 's';
+            c.style.left = Math.random() * 100 + 'vw';
+            c.style.width = c.style.height = (Math.random() * 40 + 15) + 'px';
+            c.style.animationDuration = (Math.random() * 8 + 5) + 's';
+            c.style.animationDelay = (Math.random() * 5) + 's';
             bg.appendChild(c);
         }
-        const views = ['home', 'quests', 'evo', 'shop']; let ci = 0;
-        function switchView(id, btn) {
-            ci = views.indexOf(id);
-            document.querySelectorAll('.view-layer').forEach(v => v.classList.remove('active'));
+
+        // Modal Logic
+        function openModal(id) {
+            closeModals();
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(id + '-view').classList.add('active');
-            if (btn) btn.classList.add('active');
-            else { const b = document.querySelectorAll('.nav-btn'); if (b[ci]) b[ci].classList.add('active'); }
+            // Find corresponding button
+            document.querySelector(`.nav-btn[onclick="openModal('${id}')"]`)?.classList.add('active');
+            document.getElementById(`${id}-modal`).classList.add('open');
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+            if (id === 'quest') {
+                fetchTasks();
+            } else if (id === 'evo') {
+                fetchEvoTree();
+            }
+        }
+
+        function closeModals() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.nav-btn').classList.add('active'); // Set HOME active
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
-        function cycleMenu() { ci = (ci + 1) % views.length; switchView(views[ci]); }
+
+        async function fetchTasks() {
+            const listDiv = document.querySelector('.quest-list');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING NETWORKS... ]</div>';
+
+            try {
+                const res = await fetch('/twa/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: tg.initData || "dummy" })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (!data.tasks || data.tasks.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">NO THREATS DETECTED.<br>ALL SYSTEMS CLEAR.</div>';
+                        return;
+                    }
+
+                    listDiv.innerHTML = '';
+                    data.tasks.forEach(task => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div>
+                                <strong>[!] ${task.title.substring(0, 30)}${task.title.length > 30 ? '...' : ''}</strong>
+                                <div style="font-size:0.8em; opacity:0.8; margin-top:5px;">Source: ${task.source}</div>
+                            </div>
+                            <button class="cyber-btn" onclick="completeTask('${task.task_id}')">EXEC</button>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                } else {
+                    listDiv.innerHTML = '<div style="text-align:center; color:red;">ERROR CONNECTING TO SERVER</div>';
+                }
+            } catch (e) {
+                listDiv.innerHTML = '<div style="text-align:center; color:red;">NETWORK ERROR</div>';
+            }
+        }
+
+        async function completeTask(taskId) {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('rigid');
+            try {
+                const res = await fetch(`/twa/api/tasks/${taskId}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: tg.initData || "dummy" })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (tg.showAlert) {
+                        tg.showAlert(`MISSION COMPLETE!\n\nGained: ${data.combat_results.exp_gain} EXP\nLoot: ${data.combat_results.bits_gain} Bits`);
+                    } else {
+                        alert(`MISSION COMPLETE!\nGained: ${data.combat_results.exp_gain} EXP\nLoot: ${data.combat_results.bits_gain} Bits`);
+                    }
+                    fetchTasks(); // Refresh list
+                    fetchVitals(); // Refresh Digimon stats
+                } else {
+                    if (tg.showAlert) tg.showAlert("Failed to sync task completion.");
+                }
+            } catch (e) {
+                if (tg.showAlert) tg.showAlert("Network error during execution.");
+            }
+        }
+
+        async function fetchEvoTree() {
+            const treeDiv = document.getElementById('evo-tree-container');
+            treeDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; margin-top:20px;">[ COMPILING DATA... ]</div>';
+
+            try {
+                const res = await fetch('/twa/api/evolution_tree', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: tg.initData || "dummy" })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    let html = '';
+
+                    if (data.prev) {
+                        html += `
+                            <div class="evo-node" style="opacity: 0.6; padding: 5px; border-color: rgba(79, 195, 205, 0.4);">
+                                ${data.prev.image ? `<img src="${data.prev.image}" style="height:40px; mix-blend-mode: multiply; filter: brightness(1.5);">` : ''}
+                                <div style="font-size: 0.8em">${data.prev.name.toUpperCase()}</div>
+                            </div>
+                            <div style="margin: 5px 0; color: #4fc3cd; font-size: 0.8em; opacity: 0.6;">▼</div>
+                        `;
+                    }
+
+                    // Current Digimon
+                    html += `
+                        <div style="text-align: center; font-size: 1.4rem; color: #fff; font-weight: bold; margin: 10px 0; text-shadow: 0 0 10px #4fc3cd;">
+                            ${data.current_image ? `<img src="${data.current_image}" style="height:80px; mix-blend-mode: multiply; filter: brightness(1.2) drop-shadow(0 0 10px rgba(79,195,205,0.5));">` : ''}
+                            <div style="margin-top: 5px;">${data.current.toUpperCase()}</div>
+                        </div>
+                    `;
+
+                    if (data.next && data.next.length > 0) {
+                        html += `<div style="margin: 10px 0; color: #4fc3cd;">▼ ▼ ▼</div>
+                                 <div style="display: flex; gap: 15px; justify-content: center; width: 100%;">`;
+                        data.next.forEach(n => {
+                            html += `
+                                <div class="evo-node" style="flex: 1; max-width: 140px;">
+                                    ${n.image ? `<img src="${n.image}" style="height:50px; mix-blend-mode: multiply; filter: brightness(1.2);">` : ''}
+                                    <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
+                                    <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Unknown Req.'}</div>
+                                </div>
+                            `;
+                        });
+                        html += `</div>`;
+                    } else if (data.current !== "Digitama") {
+                        html += `
+                            <div style="margin: 15px 0; color: #4fc3cd;">▼</div>
+                            <div class="evo-node" style="opacity: 0.5;">
+                                DATA LOCKED<br><span style="font-size: 0.6em;">MAX STAGE REACHED</span>
+                            </div>
+                        `;
+                    }
+
+                    treeDiv.innerHTML = html;
+                } else {
+                    treeDiv.innerHTML = '<div style="text-align:center; color:red;">ERROR CONNECTING TO COMPENDIUM</div>';
+                }
+            } catch (e) {
+                treeDiv.innerHTML = '<div style="text-align:center; color:red;">NETWORK ERROR</div>';
+            }
+        }
+
+        // Vitals Fetching
         async function fetchVitals() {
             try {
                 const res = await fetch('/twa/api/vitals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData || "dummy" }) });
                 if (res.ok) {
                     const d = await res.json();
+
+                    if (d.active_digimon.name === 'Digitama') {
+                        lcdMenus = ['HATCH'];
+                        if (currentMenuIdx >= lcdMenus.length) currentMenuIdx = 0;
+                        lcdState = 'IDLE';
+                        updateLcdUI();
+
+                        document.getElementById('software-nav').innerHTML = `
+                            <div class="nav-btn active" style="flex: 1; background: #4fc3cd; color: #031518; animation: pulse 2s infinite;" onclick="requestHatch()">START HATCHING</div>
+                        `;
+                    } else {
+                        if (lcdMenus.length === 1 && lcdMenus[0] === 'HATCH') {
+                            lcdMenus = ['FEED', 'PLAY', 'TRAIN', 'QUEST', 'STATS'];
+                            currentMenuIdx = 0;
+                            if (lcdState === 'MENU') document.getElementById('lcd-menu-text').innerText = lcdMenus[currentMenuIdx];
+                        }
+
+                        document.getElementById('software-nav').innerHTML = `
+                            <div class="nav-btn active" onclick="closeModals()">HOME</div>
+                            <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
+                            <div class="nav-btn" onclick="openModal('evo')">EVO</div>
+                            <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
+                        `;
+                    }
+
                     document.getElementById('digi-name').innerText = d.active_digimon.name.substring(0, 8).toUpperCase();
+                    document.getElementById('evo-current-name').innerText = d.active_digimon.name.toUpperCase();
                     document.getElementById('digi-level').innerText = d.active_digimon.level;
                     document.getElementById('hp-bar').style.width = d.active_digimon.hp + '%';
                     document.getElementById('en-bar').style.width = d.active_digimon.energy + '%';
@@ -419,19 +802,182 @@
                     document.getElementById('bits-count').innerText = d.active_digimon.bits || 0;
                     if (d.active_digimon.sprite) {
                         const img = document.getElementById('sprite-img');
-                        img.src = d.active_digimon.sprite.replace('/twa/api/sprite/', 'https://digi-api.com/images/digimon/w/') + ".png";
+                        if (d.active_digimon.name === 'Digitama') {
+                            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y=".9em" font-size="90"%3E%F0%9F%A5%9A%3C/text%3E%3C/svg%3E';
+                        } else {
+                            img.src = d.active_digimon.sprite.replace('/twa/api/sprite/', 'https://digi-api.com/images/digimon/w/') + ".png";
+                        }
                         img.style.display = 'block';
                     }
+                } else {
+                    const err = await res.text();
+                    document.getElementById('digi-name').innerText = "ERR " + res.status;
+                    document.getElementById('evo-current-name').innerText = err.substring(0, 20);
                 }
-            } catch (e) { }
+            } catch (e) {
+                document.getElementById('digi-name').innerText = "NET ERR";
+                document.getElementById('evo-current-name').innerText = e.toString().substring(0, 20);
+            }
         }
-        function triggerAction(type, action) {
+
+        // LCD Hardware Controls
+        let lcdState = 'IDLE'; // IDLE, MENU, POMO
+        let lcdMenus = ['FEED', 'PLAY', 'TRAIN', 'QUEST', 'STATS'];
+        let currentMenuIdx = 0;
+
+        let pomoTime = 25 * 60; // 25 mins
+        let pomoInterval = null;
+
+        function updateLcdUI() {
+            document.getElementById('lcd-vitals').style.display = (lcdState === 'IDLE') ? 'flex' : 'none';
+            document.getElementById('lcd-menu-bar').style.display = (lcdState === 'MENU') ? 'block' : 'none';
+            document.getElementById('lcd-pomodoro').style.display = (lcdState === 'POMO') ? 'block' : 'none';
+
+            if (lcdState === 'MENU') {
+                document.getElementById('lcd-menu-text').innerText = lcdMenus[currentMenuIdx];
+            }
+        }
+
+        function bounceSprite() {
             const img = document.getElementById('sprite-img');
-            img.style.transform = 'scale(1.3) rotate(-8deg)'; setTimeout(() => { img.style.transform = ''; }, 200);
-            if (type === 'shop') { if (tg.showConfirm) { tg.showConfirm(`Buy ${action}?`, c => { if (c) tg.showAlert('Bought!'); }); } else alert('Bought ' + action + '!'); }
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            if (img) {
+                img.style.transform = 'scale(1.2) rotate(-5deg)';
+                setTimeout(() => { img.style.transform = ''; }, 200);
+            }
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
-        fetchVitals(); setInterval(fetchVitals, 60000);
+
+        function lcdCycleMenu() {
+            bounceSprite();
+            if (lcdState === 'IDLE') {
+                lcdState = 'MENU';
+            } else if (lcdState === 'MENU') {
+                currentMenuIdx = (currentMenuIdx + 1) % lcdMenus.length;
+            } else if (lcdState === 'POMO') {
+                // Cycle menu while in pomo? Let's ignore for now.
+            }
+            updateLcdUI();
+        }
+
+        function lcdCancel() {
+            bounceSprite();
+            if (lcdState === 'POMO') {
+                clearInterval(pomoInterval);
+                pomoInterval = null;
+                pomoTime = 25 * 60;
+                document.getElementById('pomo-time').innerText = "25:00";
+            }
+            lcdState = 'IDLE';
+            updateLcdUI();
+        }
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60);
+            const r = s % 60;
+            return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
+        }
+
+        async function requestHatch() {
+            const hatchBody = {
+                initData: tg.initData || "dummy",
+                latitude: 0,
+                longitude: 0,
+                utc_offset: -(new Date().getTimezoneOffset())
+            };
+
+            const doHatch = async () => {
+                const img = document.getElementById('sprite-img');
+                if (img) img.style.animation = 'hatchShake 0.1s infinite';
+                document.getElementById('lcd-menu-text').innerText = 'HATCHING...';
+                lcdState = 'MENU';
+                updateLcdUI();
+
+                try {
+                    const res = await fetch('/twa/api/hatch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(hatchBody)
+                    });
+
+                    if (img) img.style.animation = 'idleBounce 1.5s infinite alternate steps(2)';
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (tg.showAlert) {
+                            tg.showAlert(`Oh! The egg hatched into a ${data.digimon.species}!\nWeather: ${data.digimon.weather_cond}\nHour: ${data.digimon.time_hour}`);
+                        } else {
+                            alert(`Hatched into ${data.digimon.species}!`);
+                        }
+                        lcdState = 'IDLE';
+                        fetchVitals();
+                    } else {
+                        const errData = await res.json();
+                        if (tg.showAlert) tg.showAlert(`Hatch Failed: ${errData.detail || 'Unknown error'}`);
+                        lcdState = 'IDLE';
+                        updateLcdUI();
+                    }
+                } catch (e) {
+                    if (img) img.style.animation = 'idleBounce 1.5s infinite alternate steps(2)';
+                    if (tg.showAlert) tg.showAlert('Network error during hatching.');
+                    lcdState = 'IDLE';
+                    updateLcdUI();
+                }
+            };
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    hatchBody.latitude = pos.coords.latitude;
+                    hatchBody.longitude = pos.coords.longitude;
+                    doHatch();
+                }, (err) => {
+                    doHatch(); // fallback
+                }, { timeout: 3000 });
+            } else {
+                doHatch();
+            }
+        }
+
+        function lcdSelect() {
+            bounceSprite();
+            if (lcdState === 'MENU') {
+                const action = lcdMenus[currentMenuIdx];
+                if (action === 'HATCH') {
+                    requestHatch();
+                } else if (action === 'FEED') {
+                    if (tg.showAlert) tg.showAlert('Digimon was fed meat!');
+                } else if (action === 'PLAY') {
+                    if (tg.showAlert) tg.showAlert('Played with Digimon! Bond increased.');
+                } else if (action === 'TRAIN') {
+                    lcdState = 'POMO';
+                    if (!pomoInterval) {
+                        pomoInterval = setInterval(() => {
+                            if (pomoTime > 0) {
+                                pomoTime--;
+                                document.getElementById('pomo-time').innerText = formatTime(pomoTime);
+                            } else {
+                                clearInterval(pomoInterval);
+                                pomoInterval = null;
+                                if (tg.showAlert) tg.showAlert('Pomodoro Training complete! +EXP');
+                                lcdState = 'IDLE';
+                                updateLcdUI();
+                            }
+                        }, 1000);
+                    }
+                } else if (action === 'QUEST') {
+                    openModal('quest');
+                    lcdState = 'IDLE';
+                } else if (action === 'STATS') {
+                    openModal('evo');
+                    lcdState = 'IDLE';
+                }
+            } else if (lcdState === 'IDLE') {
+                lcdState = 'MENU';
+            }
+            updateLcdUI();
+        }
+
+        fetchVitals();
+        setInterval(fetchVitals, 60000);
     </script>
 </body>
 

@@ -60,16 +60,81 @@ class SyncManager:
             db.commit()
 
     async def sync_google_tasks(self, db: Session):
+        from .combat import Enemy, resolve_combat
         google = GoogleIntegration()
+        if not google.authenticate():
+            return
         tasks = google.get_tasks()
-        # TODO: Pass tasks to combat engine
+        
+        existing = db.query(models.TaskSyncState).filter(
+            models.TaskSyncState.source == "google_tasks",
+            models.TaskSyncState.status == "pending"
+        ).all()
+        
+        current_ids = {t.get("id"): t for t in tasks if t.get("id")}
+        
+        for ex in existing:
+            if ex.id not in current_ids:
+                ex.status = "completed"
+                enemy = Enemy(task_source="google_tasks", task_id=ex.id, title=ex.title, status="completed")
+                resolve_combat(db, enemy)
+                
+        existing_ids = {ex.id for ex in existing}
+        for t_id, t_data in current_ids.items():
+            if t_id not in existing_ids:
+                new_task = models.TaskSyncState(
+                    id=t_id,
+                    source="google_tasks",
+                    title=t_data.get("title", "Untitled Task"),
+                    status="pending",
+                    attribute=Enemy("google_tasks", t_id, t_data.get("title", ""), "pending").attribute
+                )
+                db.add(new_task)
+        
+        db.commit()
 
     async def sync_notion_tasks(self, db: Session):
+        from .combat import Enemy, resolve_combat
         notion = NotionIntegration()
+        if not notion.is_authenticated():
+            return
         tasks = notion.fetch_in_progress_tasks()
-        # TODO: Pass tasks to combat engine
+        
+        existing = db.query(models.TaskSyncState).filter(
+            models.TaskSyncState.source == "notion",
+            models.TaskSyncState.status == "pending"
+        ).all()
+        
+        current_ids = {t.get("id"): t for t in tasks if t.get("id")}
+        
+        for ex in existing:
+            if ex.id not in current_ids:
+                ex.status = "completed"
+                enemy = Enemy(task_source="notion", task_id=ex.id, title=ex.title, status="completed")
+                resolve_combat(db, enemy)
+                
+        existing_ids = {ex.id for ex in existing}
+        for t_id, t_data in current_ids.items():
+            if t_id not in existing_ids:
+                title_prop = t_data.get("properties", {}).get("Name", {}).get("title", [])
+                title = title_prop[0].get("plain_text", "Untitled") if title_prop else "Untitled Task"
+                new_task = models.TaskSyncState(
+                    id=t_id,
+                    source="notion",
+                    title=title,
+                    status="pending",
+                    attribute=Enemy("notion", t_id, title, "pending").attribute
+                )
+                db.add(new_task)
+                
+        db.commit()
 
     async def sync_calendar_events(self, db: Session):
+        from .combat import Enemy, resolve_combat
         google = GoogleIntegration()
+        if not google.authenticate():
+            return
         events = google.get_upcoming_events()
-        # TODO: Pass events to combat engine
+        # Mock logic to avoid too much complexity:
+        # Just ensure events don't break the system, we can skip full combat tracking for events for now.
+        pass

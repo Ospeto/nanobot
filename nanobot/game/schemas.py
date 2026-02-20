@@ -27,6 +27,7 @@ class DigimonResponse(DigimonBase):
     is_active: bool
     created_at: str
     last_updated: str
+    hatch_time: Optional[str] = None
     
     class Config:
         from_attributes = True

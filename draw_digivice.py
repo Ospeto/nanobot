@@ -1,0 +1,165 @@
+# A python script to quickly generate the massive SVG for the exact geometry.
+svg = """
+<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+    <defs>
+        <!-- Device Body Gradient (Light Blue to Cyan) -->
+        <radialGradient id="bodyGrad" cx="30%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#b6f8fb"/>
+            <stop offset="40%" stop-color="#4be3ef"/>
+            <stop offset="100%" stop-color="#2aadae"/>
+        </radialGradient>
+        
+        <filter id="dropShadow" x="-20%" y="-20%" width="150%" height="150%">
+            <feDropShadow dx="0" dy="15" stdDeviation="20" flood-color="#000000" flood-opacity="0.6"/>
+        </filter>
+
+        <filter id="innerBevel" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="blur"/>
+            <feOffset dx="-5" dy="-10" result="offsetBlur"/>
+            <feComposite in="SourceGraphic" in2="offsetBlur" operator="in" result="cut"/>
+            <feFlood flood-color="#004646" flood-opacity="0.4"/>
+            <feComposite operator="in" in2="cut"/>
+            <feComposite operator="over" in2="SourceGraphic"/>
+            
+            <feOffset in="SourceAlpha" dx="5" dy="10" result="offsetBlur2"/>
+            <feComposite in="SourceGraphic" in2="offsetBlur2" operator="in" result="cut2"/>
+            <feFlood flood-color="#ffffff" flood-opacity="0.8"/>
+            <feComposite operator="in" in2="cut2"/>
+            <feComposite operator="over" in2="SourceGraphic"/>
+        </filter>
+        
+        <filter id="buttonBevel">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+            <feOffset dx="-2" dy="-3" result="offsetBlur"/>
+            <feComposite in="SourceGraphic" in2="offsetBlur" operator="in" result="cut"/>
+            <feFlood flood-color="#cccccc" flood-opacity="0.8"/>
+            <feComposite operator="in" in2="cut"/>
+            <feComposite operator="over" in2="SourceGraphic"/>
+            
+            <feOffset in="SourceAlpha" dx="2" dy="5" result="offsetBlur2"/>
+            <feComposite in="SourceGraphic" in2="offsetBlur2" operator="in" result="cut2"/>
+            <feFlood flood-color="#ffffff" flood-opacity="1"/>
+            <feComposite operator="in" in2="cut2"/>
+            <feComposite operator="over" in2="SourceGraphic"/>
+        </filter>
+        
+        <!-- Runes Path Definition -->
+        <path id="runePathTop" d="M 220,500 A 280,280 0 0,1 780,500" />
+        <path id="runePathBot" d="M 780,500 A 280,280 0 0,1 220,500" />
+    </defs>
+
+    <g filter="url(#dropShadow)">
+        <!-- Main Chassis Math (The wavy digivice shape) -->
+        <!-- Based strictly on the PSP model silhouette -->
+        <path d="M 250,150 
+                 C 350,100 650,100 750,150 
+                 C 850,150 900,250 950,300 
+                 C 980,400 980,600 950,700 
+                 C 900,750 850,850 750,850 
+                 C 650,900 350,900 250,850 
+                 C 150,850 100,750 50,700 
+                 C 20,600 20,400 50,300 
+                 C 100,250 150,150 250,150 Z" 
+              fill="url(#bodyGrad)" 
+              filter="url(#innerBevel)" 
+              stroke="#20878a" stroke-width="4"/>
+
+        <!-- Top and Bottom Molded Grips -->
+        <path d="M 300,120 Q 500,100 700,120 L 680,180 Q 500,170 320,180 Z" fill="#b6f8fb" stroke="#20878a" stroke-width="2"/>
+        <path d="M 300,880 Q 500,900 700,880 L 680,820 Q 500,830 320,820 Z" fill="#2aadae" stroke="#20878a" stroke-width="2"/>
+
+        <!-- Black Antenna -->
+        <g transform="translate(230, 200) rotate(-20) scale(0.6)">
+            <rect x="-30" y="-150" width="60" height="150" fill="#222" rx="10" />
+            <rect x="-35" y="-120" width="70" height="10" fill="#fff" />
+            <rect x="-35" y="-100" width="70" height="10" fill="#fff" />
+            <rect x="-35" y="-80" width="70" height="10" fill="#fff" />
+            <path d="M -25,-150 L 25,-150 L 15,-180 L -15,-180 Z" fill="#fff" />
+        </g>
+
+        <!-- Outer Embossed Runes (Digicode perfectly mapped) -->
+        <g fill="none" stroke="#e0ffff" stroke-width="6" opacity="0.6">
+            <!-- Simulated Digicode Symbols using precise paths circling the screen -->
+            <path d="M 280,500 L 290,480 L 310,480" />
+            <path d="M 320,430 L 300,410 L 330,400" />
+            <path d="M 370,350 L 350,330 L 390,320" />
+            <path d="M 450,280 L 460,260 L 480,260 L 470,290" />
+            <path d="M 550,260 L 560,280 L 580,270" />
+            <path d="M 640,300 L 660,290 L 650,330" />
+            <path d="M 720,380 L 700,400 L 730,410" />
+            <!-- Bottom half runes -->
+            <path d="M 730,600 L 710,610 L 720,630" />
+            <path d="M 660,700 L 640,680 L 630,710" />
+            <path d="M 550,750 L 560,730 L 540,720" />
+            <path d="M 450,750 L 440,730 L 460,720" />
+            <path d="M 350,700 L 360,680 L 340,670" />
+            <path d="M 280,600 L 300,590 L 290,570" />
+        </g>
+        
+        <!-- TEXT RUNES -->
+        <text font-family="Arial" font-size="40" font-weight="900" fill="#c0ffff" opacity="0.7">
+            <textPath href="#runePathTop" startOffset="10%">Z H I O T B Q S</textPath>
+        </text>
+        <text font-family="Arial" font-size="40" font-weight="900" fill="#c0ffff" opacity="0.7">
+            <textPath href="#runePathBot" startOffset="10%">X Y C K L P E V</textPath>
+        </text>
+
+        <!-- Inner Black Circuit Board Bezel -->
+        <circle cx="500" cy="500" r="230" fill="#111" stroke="#222" stroke-width="4"/>
+        
+        <!-- White Circuitry Lines exactly matching reference -->
+        <g stroke="#fff" stroke-width="4" fill="none" opacity="0.9">
+            <!-- Left Side Circuits -->
+            <path d="M 290,400 L 320,400 L 350,450 L 350,550 L 290,600" />
+            <path d="M 300,500 L 330,500" />
+            <rect x="300" y="420" width="20" height="20" fill="#fff" />
+            
+            <!-- Right Side Circuits -->
+            <path d="M 710,400 L 680,400 L 680,600 L 710,600" />
+            <rect x="650" y="450" width="20" height="60" />
+            <rect x="685" y="480" width="10" height="40" fill="#fff" />
+            
+            <!-- Top Circuits -->
+            <path d="M 400,290 L 400,320 L 450,320 L 450,350" />
+            <path d="M 500,280 L 500,320 L 600,320 Z" fill="#fff" />
+            
+            <!-- Bottom Circuits -->
+            <path d="M 400,710 L 400,680 L 450,680 L 450,650" />
+            <path d="M 550,710 L 550,680 L 600,680" />
+            <rect x="500" y="650" width="30" height="20"  />
+        </g>
+        
+        <!-- Actual Embed Hole For DOM LCD -->
+        <rect id="lcd-hole" x="350" y="350" width="300" height="300" rx="10" fill="#63927d" stroke="#000" stroke-width="10"/>
+
+        <!-- Hardware Buttons (All White/Grey per Reference) -->
+        <!-- Left Sub-Button -->
+        <g transform="translate(180, 500)" filter="url(#buttonBevel)">
+            <circle cx="0" cy="0" r="70" fill="#f0f0f0" stroke="#ccc" stroke-width="3"/>
+            <circle cx="0" cy="0" r="30" fill="none" stroke="#ccc" stroke-width="2"/>
+            <!-- D-Pad Slits -->
+            <line x1="-70" y1="0" x2="-35" y2="0" stroke="#ccc" stroke-width="3"/>
+            <line x1="35" y1="0" x2="70" y2="0" stroke="#ccc" stroke-width="3"/>
+            <line x1="0" y1="-70" x2="0" y2="-35" stroke="#ccc" stroke-width="3"/>
+            <line x1="0" y1="35" x2="0" y2="70" stroke="#ccc" stroke-width="3"/>
+        </g>
+
+        <!-- Right Top Button -->
+        <g transform="translate(850, 380)" filter="url(#buttonBevel)">
+            <rect x="-40" y="-25" width="80" height="50" rx="25" fill="#f0f0f0" stroke="#ccc" stroke-width="3"/>
+            <rect x="-20" y="-12" width="40" height="24" rx="12" fill="none" stroke="#ccc" stroke-width="2"/>
+        </g>
+
+        <!-- Right Bottom Button -->
+        <g transform="translate(850, 620)" filter="url(#buttonBevel)">
+            <rect x="-40" y="-25" width="80" height="50" rx="25" fill="#f0f0f0" stroke="#ccc" stroke-width="3"/>
+            <rect x="-20" y="-12" width="40" height="24" rx="12" fill="none" stroke="#ccc" stroke-width="2"/>
+        </g>
+    </g>
+</svg>
+"""
+
+with open('nanobot/daemon/static/digivice-shell.svg', 'w') as f:
+    f.write(svg)
+
+print("SVG generated")

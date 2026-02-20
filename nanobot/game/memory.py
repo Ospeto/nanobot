@@ -28,9 +28,26 @@ def link_memory_nodes(db: Session, source_id: str, target_id: str, relation: str
         db.refresh(edge)
     return edge
 
+def batch_upsert_memory(db: Session, entities: list[dict], relations: list[dict]) -> dict:
+    """Atomically upserts multiple nodes and links them explicitly in the SecondBrain."""
+    results = {"nodes": [], "edges": []}
+    for ent in entities:
+        n = add_memory_node(db, type=ent["type"], name=ent["name"], properties=ent.get("properties", {}))
+        results["nodes"].append(n.id)
+    
+    for rel in relations:
+        e = link_memory_nodes(db, source_id=rel["source_id"], target_id=rel["target_id"], relation=rel["relation"], properties=rel.get("properties", {}))
+        results["edges"].append(e.id)
+        
+    return results
+
 def search_memory(db: Session, query: str):
     nodes = db.query(models.SecondBrainNode).filter(models.SecondBrainNode.name.ilike(f"%{query}%")).all()
-    return nodes
+    # also search in properties (dirty hack for sqlite without FTS)
+    properties_nodes = db.query(models.SecondBrainNode).filter(models.SecondBrainNode.properties.ilike(f"%{query}%")).all()
+    
+    results = {n.id: n for n in nodes + properties_nodes}
+    return list(results.values())
 
 def get_memory_context_string(db: Session, query: str = None) -> str:
     """Returns a stringified version of recent or relevant memories for prompt injection."""
