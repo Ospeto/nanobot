@@ -151,21 +151,39 @@ class ListTasksTool(Tool):
     def parameters(self) -> dict:
         return {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "source_filter": {
+                    "type": "string",
+                    "description": "Optional: Filter by 'notion' or 'google_tasks'. Leave empty to get all tasks."
+                }
+            },
             "required": []
         }
         
-    async def execute(self, **kwargs) -> str:
+    async def execute(self, source_filter: str | None = None, **kwargs) -> str:
         if not HAS_GAME:
             return "Game module not available."
         db = SessionLocal()
         try:
             from nanobot.game import models
-            tasks = db.query(models.TaskSyncState).filter(models.TaskSyncState.status == "pending").all()
+            query = db.query(models.TaskSyncState).filter(models.TaskSyncState.status == "pending")
+            if source_filter:
+                query = query.filter(models.TaskSyncState.source == source_filter)
+            
+            tasks = query.all()
             if not tasks:
-                return "You have ZERO pending tasks! Good job! Tell the user they are completely clear."
+                return f"You have ZERO pending tasks{' for ' + source_filter if source_filter else ''}! Good job! Tell the user they are completely clear."
                 
-            task_list = "\\n".join([f"- {t.title} ({t.source})" for t in tasks])
-            return f"PENDING TASKS:\\n{task_list}\\n\\nTell the human they need to finish these to gain EXP and Food!"
+            notion_tasks = [t.title for t in tasks if t.source == 'notion']
+            google_tasks = [t.title for t in tasks if t.source == 'google_tasks']
+            
+            output = []
+            if notion_tasks:
+                output.append(f"**Notion Tasks:**\n" + "\n".join(f"- {t}" for t in notion_tasks))
+            if google_tasks:
+                output.append(f"**Google Tasks:**\n" + "\n".join(f"- {t}" for t in google_tasks))
+            
+            task_list = "\n\n".join(output)
+            return f"PENDING TASKS:\n{task_list}\n\nTell the human they need to finish these to gain EXP and Food!"
         finally:
             db.close()
