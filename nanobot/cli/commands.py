@@ -1043,5 +1043,16 @@ def _login_github_copilot() -> None:
         raise typer.Exit(1)
 
 
+@app.command("daemon")
+def start_daemon(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Daemon host"),
+    port: int = typer.Option(8000, "--port", "-p", help="Daemon port"),
+):
+    """Start the Digimon FastAPI Daemon."""
+    import uvicorn
+    console.print(f"{__logo__} Starting Digimon Daemon on {host}:{port}...")
+    uvicorn.run("nanobot.daemon.main:app", host=host, port=port, reload=True)
+
+
 if __name__ == "__main__":
     app()

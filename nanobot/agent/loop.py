@@ -186,7 +186,7 @@ class AgentLoop:
         tools_used: list[str] = []
         text_only_retried = False
 
-        while iteration < self.max_iterations:
+        while iteration < min(self.max_iterations, 5): # STRICT COST GUARDRAIL
             iteration += 1
 
             response = await self.provider.chat(

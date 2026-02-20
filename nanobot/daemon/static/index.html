@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Digivice Partner</title>
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --text-color: #e0e0e0;
+            --primary: #0f3460;
+            --secondary: #e94560;
+            --accent: #16213e;
+            --nav-bg: #111;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace; /* Retro feel */
+            background-color: var(--TelegramButtonColor, var(--bg-color));
+            color: var(--TelegramTextColor, var(--text-color));
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* HUD */
+        #hud {
+            padding: 10px;
+            background: var(--nav-bg);
+            border-bottom: 2px solid var(--secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+        .vitals {
+            font-size: 0.9em;
+        }
+        .vital-bar {
+            width: 100px;
+            height: 10px;
+            background: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            display: inline-block;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+        .vital-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+        }
+        /* Content Area */
+        #content {
+            flex-grow: 1;
+            overflow-y: auto;
+            position: relative;
+        }
+        .tab-content {
+            display: none;
+            height: 100%;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Enclosure (Home) */
+        #home-tab {
+            background: #8fbc8f; /* grass like */
+            position: relative;
+        }
+        #enclosure {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .pixel-digimon {
+            width: 64px;
+            height: 64px;
+            background-color: orange;
+            border-radius: 10px;
+            animation: bounce 1s infinite alternate;
+            transition: transform 0.2s;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+        /* Navigation Bar */
+        #bottom-nav {
+            display: flex;
+            background: var(--nav-bg);
+            border-top: 2px solid var(--secondary);
+            height: 60px;
+        }
+        .nav-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: white;
+            font-family: inherit;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .nav-btn:active, .nav-btn.active {
+            background: var(--primary);
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: 1px solid var(--secondary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:active {
+            background: var(--secondary);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div>
+            <div><strong><span id="digi-name">Loading...</span></strong> [Lv <span id="digi-level">?</span>]</div>
+            <div>Bits: <span id="bits-count">0</span></div>
+        </div>
+        <div class="vitals">
+            <div>HP <div class="vital-bar"><div class="vital-fill" id="hp-bar" style="width: 100%;"></div></div></div>
+            <div>EN <div class="vital-bar"><div class="vital-fill" id="en-bar" style="width: 100%; background: #2196f3;"></div></div></div>
+            <div>HG <div class="vital-bar"><div class="vital-fill" id="hg-bar" style="width: 100%; background: #ff9800;"></div></div></div>
+        </div>
+    </div>
+
+    <div id="content">
+        <!-- Home / Enclosure Tab -->
+        <div id="home-tab" class="tab-content active">
+            <div id="enclosure">
+                <div class="pixel-digimon" id="sprite"></div>
+            </div>
+            <!-- Actions -->
+            <div style="position: absolute; bottom: 20px; left: 10px; right: 10px; display: flex; justify-content: space-around;">
+                <button onclick="interact('feed')">🍖 Feed</button>
+                <button onclick="interact('heal')">💊 Heal</button>
+                <button onclick="interact('pet')">👋 Pet</button>
+            </div>
+        </div>
+
+        <!-- Quests Tab -->
+        <div id="quests-tab" class="tab-content" style="background: var(--bg-color);">
+            <h2>Active Targets</h2>
+            <div id="task-list" style="color: var(--text-color);">
+                <p>Syncing Dark Data anomalies...</p>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li style="background: #333; margin: 5px 0; padding: 10px; border-left: 4px solid var(--secondary);">
+                        [Virus] Finish Project Report
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Training / Evolution Tab -->
+        <div id="evo-tab" class="tab-content" style="background: var(--bg-color); color: var(--text-color);">
+            <h2>Evolution Tree</h2>
+            <p>Current: <strong id="current-evo" style="color: var(--secondary);">Rookie</strong></p>
+            <div style="border: 1px dashed #666; padding: 15px; text-align: center; border-radius: 5px;">
+                <p>Next possible: Greymon, Tyrannomon</p>
+                <button disabled>Conditions Not Met</button>
+            </div>
+        </div>
+
+        <!-- Shop Tab -->
+        <div id="shop-tab" class="tab-content" style="background: var(--bg-color); color: var(--text-color);">
+            <h2>Reward Center</h2>
+            <p>Spend Bits to support your partner.</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="buy('X-Antibody')">🧬 X-Antibody (5000b)</button>
+                <button onclick="buy('Sirloin')">🥩 Sirloin (50b)</button>
+                <button onclick="buy('Bandage')">🩹 Bandage (30b)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bottom-nav">
+        <button class="nav-btn active" onclick="switchTab('home')">🏠 Home</button>
+        <button class="nav-btn" onclick="switchTab('quests')">⚔️ Quests</button>
+        <button class="nav-btn" onclick="switchTab('evo')">🧬 Evo</button>
+        <button class="nav-btn" onclick="switchTab('shop')">🛒 Shop</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(tabId + '-tab').classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        async function fetchVitals() {
+            try {
+                const res = await fetch('/twa/api/vitals', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ initData: tg.initData })
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    document.getElementById('digi-name').innerText = data.active_digimon.name;
+                    document.getElementById('digi-level').innerText = data.active_digimon.level;
+                    
+                    document.getElementById('hp-bar').style.width = data.active_digimon.hp + '%';
+                    document.getElementById('en-bar').style.width = data.active_digimon.energy + '%';
+                    document.getElementById('hg-bar').style.width = data.active_digimon.hunger + '%';
+                }
+            } catch (e) {
+                console.error("Failed to fetch vitals", e);
+            }
+        }
+
+        function interact(action) {
+            const sprite = document.getElementById('sprite');
+            sprite.style.transform = 'scale(1.2)';
+            setTimeout(() => { sprite.style.transform = ''; }, 200);
+            
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        }
+
+        function buy(item) {
+            if (tg.showConfirm) {
+                tg.showConfirm(`Buy ${item}?`, (confirmed) => {
+                    if(confirmed) {
+                        tg.showAlert("Purchased!");
+                    }
+                });
+            } else {
+                alert(`Purchased ${item}`);
+            }
+        }
+
+        // Init
+        fetchVitals();
+    </script>
+</body>
+</html>
