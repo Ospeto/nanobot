@@ -386,6 +386,38 @@ class AgentLoop:
             chat_id=msg.chat_id,
         )
 
+        # --- FORCED TASK PRE-FETCH ---
+        # Gemini refuses to call list_tasks while roleplaying as a baby Digimon.
+        # If the user asks about tasks, we pre-execute the tool and inject results
+        # directly into the system prompt so the LLM has real data to work with.
+        _msg_lower = msg.content.lower()
+        _task_triggers = ["task", "to do", "todo", "what should i do", "what do i need", "dark data", "pending"]
+        if any(t in _msg_lower for t in _task_triggers):
+            try:
+                list_tasks_tool = self.tools.get("list_tasks")
+                if list_tasks_tool:
+                    # Determine source filter from user message
+                    if "google" in _msg_lower:
+                        _source = "google_tasks"
+                    elif "notion" in _msg_lower:
+                        _source = "notion"
+                    else:
+                        _source = "all"
+                    task_result = await list_tasks_tool.execute(source_filter=_source)
+                    # Inject pre-fetched data into system prompt
+                    if initial_messages and initial_messages[0].get("role") == "system":
+                        initial_messages[0]["content"] += (
+                            f"\n\n--- PRE-FETCHED TASK DATA (use this data in your response!) ---\n"
+                            f"{task_result}\n"
+                            f"--- END TASK DATA ---\n"
+                            f"IMPORTANT: The task data above was retrieved by your Digivice. "
+                            f"Present this data to the Tamer in your response. Do NOT say you cannot see tasks."
+                        )
+                    logger.info("Pre-fetched tasks (source={}): {}", _source, task_result[:120])
+            except Exception as e:
+                logger.error("Task pre-fetch failed: {}", e)
+        # --- END FORCED TASK PRE-FETCH ---
+
         async def _bus_progress(content: str) -> None:
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
