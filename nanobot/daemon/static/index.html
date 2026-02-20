@@ -596,9 +596,14 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        const tg = window.Telegram ? window.Telegram.WebApp : null;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+        }
+
+        // Use dummy data if Telegram is not available
+        const getInitData = () => tg && tg.initData ? tg.initData : "dummy";
 
         // Setup background cubes
         const bg = document.getElementById('bg-world');
@@ -616,9 +621,11 @@
             closeModals();
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             // Find corresponding button
-            document.querySelector(`.nav-btn[onclick="openModal('${id}')"]`)?.classList.add('active');
+            const targetBtn = document.querySelector(`.nav-btn[onclick="openModal('${id}')"]`);
+            if (targetBtn) targetBtn.classList.add('active');
+
             document.getElementById(`${id}-modal`).classList.add('open');
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 
             if (id === 'quest') {
                 fetchTasks();
@@ -630,8 +637,11 @@
         function closeModals() {
             document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector('.nav-btn').classList.add('active'); // Set HOME active
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+            const homeBtn = document.querySelector('.nav-btn[onclick="closeModals()"]');
+            if (homeBtn) homeBtn.classList.add('active'); // Set HOME active
+
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
         async function fetchTasks() {
@@ -642,7 +652,7 @@
                 const res = await fetch('/twa/api/tasks', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData: tg.initData || "dummy" })
+                    body: JSON.stringify({ initData: getInitData() })
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -673,17 +683,17 @@
         }
 
         async function completeTask(taskId) {
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('rigid');
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('rigid');
             try {
                 const res = await fetch(`/twa/api/tasks/${taskId}/complete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData: tg.initData || "dummy" })
+                    body: JSON.stringify({ initData: getInitData() })
                 });
 
                 if (res.ok) {
                     const data = await res.json();
-                    if (tg.showAlert) {
+                    if (tg && tg.showAlert) {
                         tg.showAlert(`MISSION COMPLETE!\n\nGained: ${data.combat_results.exp_gain} EXP\nLoot: ${data.combat_results.bits_gain} Bits`);
                     } else {
                         alert(`MISSION COMPLETE!\nGained: ${data.combat_results.exp_gain} EXP\nLoot: ${data.combat_results.bits_gain} Bits`);
@@ -691,10 +701,12 @@
                     fetchTasks(); // Refresh list
                     fetchVitals(); // Refresh Digimon stats
                 } else {
-                    if (tg.showAlert) tg.showAlert("Failed to sync task completion.");
+                    if (tg && tg.showAlert) tg.showAlert("Failed to sync task completion.");
+                    else alert("Failed to sync task completion");
                 }
             } catch (e) {
-                if (tg.showAlert) tg.showAlert("Network error during execution.");
+                if (tg && tg.showAlert) tg.showAlert("Network error during execution.");
+                else alert("Network error during execution");
             }
         }
 
@@ -706,7 +718,7 @@
                 const res = await fetch('/twa/api/evolution_tree', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData: tg.initData || "dummy" })
+                    body: JSON.stringify({ initData: getInitData() })
                 });
 
                 if (res.ok) {
@@ -765,7 +777,7 @@
         // Vitals Fetching
         async function fetchVitals() {
             try {
-                const res = await fetch('/twa/api/vitals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData || "dummy" }) });
+                const res = await fetch('/twa/api/vitals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: getInitData() }) });
                 if (res.ok) {
                     const d = await res.json();
 
@@ -815,8 +827,8 @@
                     document.getElementById('evo-current-name').innerText = err.substring(0, 20);
                 }
             } catch (e) {
-                document.getElementById('digi-name').innerText = "NET ERR";
-                document.getElementById('evo-current-name').innerText = e.toString().substring(0, 20);
+                document.getElementById('digi-name').innerText = "JS CRASH";
+                document.getElementById('evo-current-name').innerText = (e.stack || e.message || e.toString()).substring(0, 100);
             }
         }
 
@@ -844,7 +856,7 @@
                 img.style.transform = 'scale(1.2) rotate(-5deg)';
                 setTimeout(() => { img.style.transform = ''; }, 200);
             }
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
         function lcdCycleMenu() {
@@ -879,7 +891,7 @@
 
         async function requestHatch() {
             const hatchBody = {
-                initData: tg.initData || "dummy",
+                initData: getInitData(),
                 latitude: 0,
                 longitude: 0,
                 utc_offset: -(new Date().getTimezoneOffset())
@@ -903,7 +915,7 @@
 
                     if (res.ok) {
                         const data = await res.json();
-                        if (tg.showAlert) {
+                        if (tg && tg.showAlert) {
                             tg.showAlert(`Oh! The egg hatched into a ${data.digimon.species}!\nWeather: ${data.digimon.weather_cond}\nHour: ${data.digimon.time_hour}`);
                         } else {
                             alert(`Hatched into ${data.digimon.species}!`);
@@ -912,13 +924,13 @@
                         fetchVitals();
                     } else {
                         const errData = await res.json();
-                        if (tg.showAlert) tg.showAlert(`Hatch Failed: ${errData.detail || 'Unknown error'}`);
+                        if (tg && tg.showAlert) tg.showAlert(`Hatch Failed: ${errData.detail || 'Unknown error'}`);
                         lcdState = 'IDLE';
                         updateLcdUI();
                     }
                 } catch (e) {
                     if (img) img.style.animation = 'idleBounce 1.5s infinite alternate steps(2)';
-                    if (tg.showAlert) tg.showAlert('Network error during hatching.');
+                    if (tg && tg.showAlert) tg.showAlert('Network error during hatching.');
                     lcdState = 'IDLE';
                     updateLcdUI();
                 }
@@ -944,9 +956,11 @@
                 if (action === 'HATCH') {
                     requestHatch();
                 } else if (action === 'FEED') {
-                    if (tg.showAlert) tg.showAlert('Digimon was fed meat!');
+                    if (tg && tg.showAlert) tg.showAlert('Digimon was fed meat!');
+                    else alert('Digimon was fed meat!');
                 } else if (action === 'PLAY') {
-                    if (tg.showAlert) tg.showAlert('Played with Digimon! Bond increased.');
+                    if (tg && tg.showAlert) tg.showAlert('Played with Digimon! Bond increased.');
+                    else alert('Played with Digimon! Bond increased.');
                 } else if (action === 'TRAIN') {
                     lcdState = 'POMO';
                     if (!pomoInterval) {
@@ -957,7 +971,8 @@
                             } else {
                                 clearInterval(pomoInterval);
                                 pomoInterval = null;
-                                if (tg.showAlert) tg.showAlert('Pomodoro Training complete! +EXP');
+                                if (tg && tg.showAlert) tg.showAlert('Pomodoro Training complete! +EXP');
+                                else alert('Pomodoro Training complete! +EXP');
                                 lcdState = 'IDLE';
                                 updateLcdUI();
                             }
