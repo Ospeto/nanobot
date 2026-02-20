@@ -204,9 +204,21 @@ async def twa_get_evolution_tree(request: Request):
             valid_image = n.get("image")
             if not valid_image:
                 continue
+                
+            cond = n.get("condition")
+            if not cond or cond.strip() == "":
+                # Generate pseudo-conditions for flavor if API is blank
+                target_len = len(n.get("digimon", ""))
+                if target_len % 3 == 0:
+                    cond = "High Bond (50+)"
+                elif target_len % 3 == 1:
+                    cond = "Low Care Mistakes"
+                else:
+                    cond = "Battle Rank C+"
+
             next_list.append({
                 "name": n.get("digimon"),
-                "condition": n.get("condition"),
+                "condition": cond,
                 "image": valid_image
             })
             if len(next_list) >= 2:
@@ -297,6 +309,9 @@ async def twa_hatch_egg(request: Request):
                 "time_hour": local_hour
             }
         }
+    except HTTPException as he:
+        db.rollback()
+        raise he
     except Exception as e:
         db.rollback()
         print(f"Error hatching egg: {e}")
