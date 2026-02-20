@@ -824,11 +824,12 @@
                 } else {
                     const err = await res.text();
                     document.getElementById('digi-name').innerText = "ERR " + res.status;
-                    document.getElementById('evo-current-name').innerText = err.substring(0, 20);
+                    document.getElementById('lcd-menu-text').innerText = err.substring(0, 15);
                 }
             } catch (e) {
                 document.getElementById('digi-name').innerText = "JS CRASH";
-                document.getElementById('evo-current-name').innerText = (e.stack || e.message || e.toString()).substring(0, 100);
+                document.getElementById('lcd-menu-text').innerText = 'ERROR';
+                console.error(e);
             }
         }
 
