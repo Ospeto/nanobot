@@ -170,18 +170,27 @@ class NotionIntegration:
             return None
 
     def fetch_study_materials(self) -> dict:
-        """Fetch all study materials from Courses and Notes databases."""
+        """Fetch study materials ONLY for active (In Progress) courses."""
         if not self.is_authenticated():
             return {}
             
         resources = {}
         course_id_to_name = {}
         
-        # 1. Fetch from Courses to build the ID map
+        # 1. Fetch active courses only
         course_db_id = "29a0cc17-6cb9-817d-856a-d76eaae22769"
         url = f"https://api.notion.com/v1/databases/{course_db_id}/query"
+        # Filter: only "In Progress" courses
+        payload = {
+            "filter": {
+                "property": "Status",
+                "status": {
+                    "equals": "In Progress"
+                }
+            }
+        }
         try:
-            response = requests.post(url, json={}, headers=self.headers)
+            response = requests.post(url, json=payload, headers=self.headers)
             response.raise_for_status()
             for r in response.json().get("results", []):
                 props = r.get("properties", {})
@@ -199,7 +208,7 @@ class NotionIntegration:
         except Exception as e:
             print(f"Error fetching Course resources: {e}")
 
-        # 2. Fetch from Notes and map them to courses
+        # 2. Fetch Notes linked to active courses
         notes_db_id = "29a0cc17-6cb9-81f0-8243-eeba9a314ea7"
         url = f"https://api.notion.com/v1/databases/{notes_db_id}/query"
         try:
@@ -217,10 +226,73 @@ class NotionIntegration:
                     course_name = course_id_to_name.get(course_id)
                     if course_name:
                         if course_name not in resources: resources[course_name] = []
-                        # Avoid duplicates
                         if not any(l["url"] == note_url for l in resources[course_name]):
                             resources[course_name].append({"title": f"Note: {note_name}", "url": note_url})
         except Exception as e:
             print(f"Error fetching Notes resources: {e}")
             
         return resources
+
+    def fetch_course_metadata(self) -> list[dict]:
+        """Fetch detailed metadata for all courses to identify gaps."""
+        if not self.is_authenticated():
+            return []
+            
+        course_db_id = "29a0cc17-6cb9-817d-856a-d76eaae22769"
+        url = f"https://api.notion.com/v1/databases/{course_db_id}/query"
+        courses = []
+        try:
+            response = requests.post(url, json={}, headers=self.headers)
+            response.raise_for_status()
+            for r in response.json().get("results", []):
+                props = r.get("properties", {})
+                name_prop = props.get("Name", {}).get("title", [])
+                name = name_prop[0].get("plain_text") if name_prop else "Unknown"
+                
+                # Status
+                status_obj = props.get("Status", {})
+                if status_obj.get("type") == "status":
+                    status = status_obj.get("status", {}).get("name", "Unknown")
+                else:
+                    status = "Unknown"
+                
+                # Quarter
+                quarter_obj = props.get("Quarter", {})
+                quarter = None
+                if quarter_obj.get("type") == "select" and quarter_obj.get("select"):
+                    quarter = quarter_obj["select"].get("name")
+                
+                # Professor
+                prof_obj = props.get("Professor", {})
+                professor = None
+                if prof_obj.get("type") == "rich_text":
+                    texts = prof_obj.get("rich_text", [])
+                    if texts:
+                        professor = texts[0].get("plain_text")
+                
+                # Syllabus
+                has_syllabus = bool(props.get("Syllabus", {}).get("files", []))
+                
+                # Schedule
+                schedule_obj = props.get("Schedule", {})
+                schedule = None
+                if schedule_obj.get("type") == "rich_text":
+                    texts = schedule_obj.get("rich_text", [])
+                    if texts:
+                        schedule = texts[0].get("plain_text")
+                
+                courses.append({
+                    "id": r["id"],
+                    "name": name,
+                    "status": status,
+                    "quarter": quarter,
+                    "professor": professor,
+                    "has_syllabus": has_syllabus,
+                    "schedule": schedule,
+                    "url": r.get("url"),
+                })
+        except Exception as e:
+            print(f"Error fetching course metadata: {e}")
+        
+        return courses
+

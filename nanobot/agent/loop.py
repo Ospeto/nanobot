@@ -142,7 +142,7 @@ class AgentLoop:
             from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
             from nanobot.agent.tools.init import InitDigimonTool
             from nanobot.agent.tools.calendar import BlockTimeTool, ListCalendarTool, ManageCalendarTool
-            from nanobot.agent.tools.study import SyncStudyResourcesTool, AnalyzeStudyScheduleTool
+            from nanobot.agent.tools.study import SyncStudyResourcesTool, AnalyzeStudyScheduleTool, IntrospectCoursesTool
             
             self.tools.register(FeedTool())
             self.tools.register(HealTool())
@@ -158,6 +158,7 @@ class AgentLoop:
             self.tools.register(ManageCalendarTool())
             self.tools.register(SyncStudyResourcesTool())
             self.tools.register(AnalyzeStudyScheduleTool())
+            self.tools.register(IntrospectCoursesTool())
         except ImportError as e:
             logger.error(f"Failed to import game tools: {e}")
     async def _connect_mcp(self) -> None:
