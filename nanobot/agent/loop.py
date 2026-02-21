@@ -129,6 +129,13 @@ class AgentLoop:
         # Cron tool (for scheduling)
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
+
+        # MCP Installer tools
+        from nanobot.agent.tools.mcp_registry import SearchMCPRegistryTool
+        from nanobot.agent.tools.install_skill import InstallSkillTool
+        self.tools.register(SearchMCPRegistryTool())
+        self.tools.register(InstallSkillTool())
+
         # Game tools (for Digimon companion)
         try:
             from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool, AddAssignmentTool, GenerateIDCardTool
