@@ -379,6 +379,7 @@ async def twa_digimon_action(request: Request):
                 attribute="Unknown",
                 element="Unknown",
                 level=0,
+                location="incubator",
                 is_active=False
             )
             db.add(new_egg)
@@ -410,7 +411,7 @@ def health_check():
 @app.post("/twa/api/roster")
 async def twa_get_roster(request: Request):
     """
-    Returns the full list of Digimon in the player's roster.
+    Returns the list of Digimon currently in the player's active team ('roster' location).
     """
     body = await request.json()
     init_data = body.get("initData")
@@ -423,12 +424,14 @@ async def twa_get_roster(request: Request):
     db = SessionLocal()
     try:
         from nanobot.game.models import DigimonState
-        all_digi = db.query(DigimonState).order_by(DigimonState.id).all()
+        # Only fetch Digimon explicitly assigned to the active team roster
+        all_digi = db.query(DigimonState).filter(DigimonState.location == "roster").order_by(DigimonState.id).all()
         roster = [
             {
                 "id": d.id,
                 "name": d.name,
                 "stage": d.stage,
+                "location": d.location,
                 "level": d.level,
                 "current_hp": d.current_hp,
                 "is_active": d.is_active,
@@ -463,6 +466,113 @@ async def twa_select_partner(request: Request):
         if not target:
             raise HTTPException(status_code=404, detail="Digimon not found")
         return {"status": "success", "active": target.name}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/farm")
+async def twa_get_farm(request: Request):
+    """Returns Digimon stored in the DigiFarm."""
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        farm_digi = db.query(DigimonState).filter(DigimonState.location == "farm").order_by(DigimonState.id).all()
+        farm = [{"id": d.id, "name": d.name, "stage": d.stage, "level": d.level, "current_hp": d.current_hp} for d in farm_digi]
+        return {"farm": farm}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/incubator")
+async def twa_get_incubator(request: Request):
+    """Returns Eggs stored in the Incubator."""
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        egg_digi = db.query(DigimonState).filter(DigimonState.location == "incubator").order_by(DigimonState.id).all()
+        incubator = [{"id": d.id, "name": d.name, "stage": d.stage} for d in egg_digi]
+        return {"incubator": incubator}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/transfer")
+async def twa_transfer_digimon(request: Request):
+    body = await request.json()
+    init_data = body.get("initData")
+    digimon_id = body.get("digimon_id")
+    target_location = body.get("target_location") # 'roster', 'farm', 'incubator'
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    if not digimon_id or not target_location:
+         raise HTTPException(status_code=400, detail="digimon_id and target_location required")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        target = db.query(DigimonState).filter(DigimonState.id == int(digimon_id)).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Digimon not found")
+        
+        # Enforce specific limits or business logic here if needed
+        # e.g., only transferring Digitama to Incubator
+        if target.stage != "Digitama" and target_location == "incubator":
+            raise HTTPException(status_code=400, detail="Only eggs can be stored in the Incubator")
+            
+        target.location = target_location
+        if target_location != "roster":
+            target.is_active = False # Deactivate if moved to storage
+            
+        db.commit()
+        return {"status": "success", "message": f"Moved to {target_location}!"}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/inventory")
+async def twa_get_inventory(request: Request):
+    """Returns the player's items, bits, crests, and digimentals."""
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import Inventory
+        inv = db.query(Inventory).first()
+        if not inv:
+            return {"bits": 0, "items": {}, "crests": [], "digimentals": []}
+            
+        return {
+            "bits": inv.bits,
+            "items": inv.items,
+            "crests": inv.crests,
+            "digimentals": inv.digimentals
+        }
     finally:
         db.close()
 

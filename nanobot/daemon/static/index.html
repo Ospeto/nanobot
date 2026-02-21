@@ -582,10 +582,11 @@
     <!-- Software App Navigation (bottom row) -->
     <div class="software-nav" id="software-nav">
         <div class="nav-btn active" onclick="closeModals()">HOME</div>
-        <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
-        <div class="nav-btn" onclick="openModal('evo')">EVO</div>
         <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
         <div class="nav-btn" onclick="openModal('roster')">TEAM</div>
+        <div class="nav-btn" onclick="openModal('farm')">FARM</div>
+        <div class="nav-btn" onclick="openModal('incubator')">EGGS</div>
+        <div class="nav-btn" onclick="openModal('dterm')">ITEMS</div>
     </div>
 
     <!-- Themed Full-Screen Overlays -->
@@ -652,11 +653,47 @@
     <div id="roster-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <span>// SELECT PARTNER</span>
+                <span>// PARTNER ROSTER</span>
                 <button class="close-btn" onclick="closeModals()">✕</button>
             </div>
             <div class="modal-body roster-list" id="roster-container">
                 <!-- Dynamically populated via fetchRoster() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="farm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// DIGIFARM</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="farm-container">
+                <!-- Dynamically populated via fetchFarm() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="incubator-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// INCUBATOR</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="incubator-container">
+                <!-- Dynamically populated via fetchIncubator() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="dterm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// D-TERMINAL</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="dterm-container">
+                <!-- Dynamically populated via fetchInventory() -->
             </div>
         </div>
     </div>
@@ -714,6 +751,12 @@
                 fetchEvoTree();
             } else if (id === 'roster') {
                 fetchRoster();
+            } else if (id === 'farm') {
+                fetchFarm();
+            } else if (id === 'incubator') {
+                fetchIncubator();
+            } else if (id === 'dterm') {
+                fetchInventory();
             }
         }
 
@@ -749,7 +792,13 @@
                                     <div style="font-size:0.8em; opacity:0.8; margin-top:2px;">Level: ${d.level} | HP: ${d.current_hp}</div>
                                 </div>
                             </div>
-                            <button class="cyber-btn" onclick="selectPartner(${d.id})">${d.is_active ? 'ACTIVE' : 'SELECT'}</button>
+                            <div style="display:flex; flex-direction:column; gap:5px; align-items: flex-end;">
+                                <button class="cyber-btn" style="font-size: 0.6em; width: 100%;" onclick="selectPartner(${d.id})">${d.is_active ? 'ACTIVE' : 'SELECT'}</button>
+                                ${d.name === 'Digitama'
+                                ? `<button class="cyber-btn" style="font-size: 0.6em; width: 100%;" onclick="transferDigimon(${d.id}, 'incubator')">TO INCUBATOR</button>`
+                                : `<button class="cyber-btn" style="font-size: 0.6em; width: 100%;" onclick="transferDigimon(${d.id}, 'farm')">TO FARM</button>`
+                            }
+                            </div>
                         `;
                         listDiv.appendChild(item);
                     });
@@ -758,6 +807,137 @@
                 }
             } catch (e) {
                 listDiv.innerHTML = '<div style="text-align:center; color:red;">NETWORK ERROR</div>';
+            }
+        }
+
+        async function fetchFarm() {
+            const listDiv = document.getElementById('farm-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING DIGIFARM... ]</div>';
+            try {
+                const res = await fetch('/twa/api/farm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = '';
+                    if (data.farm.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">FARM IS EMPTY.</div>';
+                        return;
+                    }
+                    data.farm.forEach(d => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <img src="/twa/api/sprite/${d.name}" style="height:40px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 2px;">
+                                <div>
+                                    <strong>${d.name.toUpperCase()}</strong>
+                                    <div style="font-size:0.8em; opacity:0.8; margin-top:2px;">Level: ${d.level} | HP: ${d.current_hp}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                                <button class="cyber-btn" style="font-size: 0.6em;" onclick="transferDigimon(${d.id}, 'roster')">TO ROSTER</button>
+                            </div>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function fetchIncubator() {
+            const listDiv = document.getElementById('incubator-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ CHECKING EGGS... ]</div>';
+            try {
+                const res = await fetch('/twa/api/incubator', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = '';
+                    if (data.incubator.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">NO EGGS.</div>';
+                        return;
+                    }
+                    data.incubator.forEach(d => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <img src="/twa/api/sprite/${d.name}" style="height:40px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 2px;">
+                                <div>
+                                    <strong>${d.name.toUpperCase()}</strong>
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                                <button class="cyber-btn" style="font-size: 0.6em;" onclick="transferDigimon(${d.id}, 'roster')">HATCH TO ROSTER</button>
+                            </div>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function fetchInventory() {
+            const listDiv = document.getElementById('dterm-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING TERMINAL... ]</div>';
+            try {
+                const res = await fetch('/twa/api/inventory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = `
+                        <div style="margin-bottom: 15px; color: #4fc3cd; text-align: center; border-bottom: 1px solid #4fc3cd; padding-bottom: 5px;">
+                            CURRENT BALANCE: <strong style="color:#fff;">${data.bits} ₿</strong>
+                        </div>
+                    `;
+
+                    if (Object.keys(data.items).length === 0) {
+                        listDiv.innerHTML += '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">INVENTORY EMPTY.</div>';
+                        return;
+                    }
+
+                    Object.keys(data.items).forEach(itemName => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div style="flex: 1;">
+                                <strong>${itemName.toUpperCase()}</strong>
+                            </div>
+                            <strong style="color:#fff;">x${data.items[itemName]}</strong>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function transferDigimon(digimonId, targetLocation) {
+            closeModals();
+            try {
+                const res = await fetch('/twa/api/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData(), digimon_id: digimonId, target_location: targetLocation })
+                });
+
+                if (res.ok) {
+                    showToast('Transferred successfully', 'SYSTEM UPDATE');
+                    await fetchVitals();
+                } else {
+                    const data = await res.json();
+                    showToast(data.detail || 'Transfer failed', 'ERROR');
+                }
+            } catch (e) {
+                showToast('Network error while transferring', 'ERROR');
             }
         }
 
