@@ -50,9 +50,11 @@ class TaskSyncState(Base):
     title = Column(String)
     due_date = Column(String, nullable=True)
     status = Column(String) # "pending", "completed", "overdue"
+    task_type = Column(String, nullable=True) # "Exam", "Assignment", etc.
     attribute = Column(String) # "Vaccine", "Virus", "Data" based on tags
     created_at = Column(String, default=lambda: datetime.utcnow().isoformat())
     updated_at = Column(String, default=lambda: datetime.utcnow().isoformat())
+    last_notified_at = Column(String, nullable=True) # ISO format timestamp
 
 class GuardrailState(Base):
     __tablename__ = "guardrails"

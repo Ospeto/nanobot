@@ -274,11 +274,101 @@ class AgentLoop:
 
         return final_content, tools_used
 
+    async def _proactive_mas_alerts_loop(self):
+        """Background task to poll MAS Dashboard and trigger LLM alerts."""
+        while self._running:
+            try:
+                # Give the agent a few seconds to start up fully
+                await asyncio.sleep(10)
+                
+                # 1. Look for an active telegram session
+                sessions = self.sessions.list_sessions()
+                tg_session = next((s for s in sessions if s["key"].startswith("telegram:")), None)
+                if not tg_session:
+                    await asyncio.sleep(300)
+                    continue
+                    
+                channel, chat_id = tg_session["key"].split(":", 1)
+                
+                # 2. Check Notion
+                from nanobot.game.notion_api import NotionIntegration
+                from nanobot.game.database import SessionLocal
+                from nanobot.game import models
+                from datetime import datetime, timezone
+                
+                notion = NotionIntegration()
+                if not notion.is_authenticated():
+                    await asyncio.sleep(3600)
+                    continue
+                    
+                tasks = notion.fetch_mas_deadlines()
+                db = SessionLocal()
+                try:
+                    for t in tasks:
+                        if not t["due_date"]: continue
+                        try:
+                            due_str = t["due_date"]
+                            if len(due_str) == 10: # YYYY-MM-DD
+                                due = datetime.strptime(due_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                            else:
+                                due = datetime.fromisoformat(due_str.replace('Z', '+00:00'))
+                        except Exception:
+                            continue
+                            
+                        now = datetime.now(timezone.utc)
+                        days_left = (due - now).days
+                        
+                        is_urgent = False
+                        if t["type"].lower() == "exam" and 0 <= days_left <= 7:
+                            is_urgent = True
+                        elif t["type"].lower() in ["assignment", "task"] and 0 <= days_left <= 3:
+                            is_urgent = True
+                            
+                        if is_urgent:
+                            state = db.query(models.TaskSyncState).filter_by(id=t["id"]).first()
+                            if not state:
+                                state = models.TaskSyncState(id=t["id"], source="notion", title=t["title"], status="pending", task_type=t["type"])
+                                db.add(state)
+                                
+                            skip = False
+                            if state.last_notified_at:
+                                try:
+                                    last = datetime.fromisoformat(state.last_notified_at)
+                                    if (datetime.utcnow() - last).total_seconds() < 86400: # 1 msg per day
+                                        skip = True
+                                except Exception:
+                                    pass
+                                    
+                            if not skip:
+                                state.last_notified_at = datetime.utcnow().isoformat()
+                                db.commit()
+                                
+                                alert_text = f"PROACTIVE SYSTEM ALERT: Look at my schedule, I have an upcoming {t['type']} called '{t['title']}' due on {t['due_date']} (in {days_left} days). Please proactively remind me about it right now and encourage me to study/work! Act like my Digimon partner panicking about my success."
+                                msg = InboundMessage(
+                                    channel=channel,
+                                    sender_id="system",
+                                    chat_id=chat_id,
+                                    content=alert_text
+                                )
+                                logger.info(f"Triggering proactive MAS alert for {t['title']}")
+                                await self.bus.publish_inbound(msg)
+                                break # Process one alert per loop to avoid spam
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"Proactive MAS loop error: {e}")
+                
+            # Sleep for an hour before checking again
+            await asyncio.sleep(3600)
+
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
         self._running = True
         await self._connect_mcp()
         logger.info("Agent loop started")
+        
+        # Start MAS proactive checker
+        asyncio.create_task(self._proactive_mas_alerts_loop())
 
         while self._running:
             try:

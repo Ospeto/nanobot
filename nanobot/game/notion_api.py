@@ -43,6 +43,57 @@ class NotionIntegration:
             print(f"Error fetching Notion Tasks: {e}")
             return []
 
+    def fetch_mas_deadlines(self):
+        if not self.is_authenticated():
+            return []
+            
+        # Target MAS Assignments/Exams Database
+        mas_db_id = "29a0cc17-6cb9-81e9-bc2e-d537a7cabb82"
+        url = f"https://api.notion.com/v1/databases/{mas_db_id}/query"
+        # Only fetch incomplete tasks
+        payload = {
+            "filter": {
+                "property": "Status",
+                "status": {
+                    "does_not_equal": "Complete"
+                }
+            }
+        }
+        try:
+            response = requests.post(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            results = response.json().get("results", [])
+            tasks = []
+            for r in results:
+                props = r.get("properties", {})
+                
+                # Parse Title
+                title_prop = props.get("Title", {}).get("title", [])
+                title = title_prop[0].get("plain_text", "Untitled") if title_prop else "Untitled"
+                
+                # Parse Due Date
+                due_date = None
+                date_prop = props.get("Due Date", {}).get("date")
+                if date_prop:
+                    due_date = date_prop.get("start")
+                    
+                # Parse Type (Exam, Assignment, etc.)
+                task_type = "Task"
+                type_prop = props.get("Type", {}).get("select")
+                if type_prop:
+                    task_type = type_prop.get("name", "Task")
+                    
+                tasks.append({
+                    "id": r["id"],
+                    "title": title,
+                    "due_date": due_date,
+                    "type": task_type
+                })
+            return tasks
+        except Exception as e:
+            print(f"Error fetching MAS Deadlines: {e}")
+            return []
+
     def complete_task(self, page_id: str) -> bool:
         if not self.is_authenticated():
             return False
