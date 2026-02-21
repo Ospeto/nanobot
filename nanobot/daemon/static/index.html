@@ -585,6 +585,7 @@
         <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
         <div class="nav-btn" onclick="openModal('evo')">EVO</div>
         <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
+        <div class="nav-btn" onclick="openModal('roster')">TEAM</div>
     </div>
 
     <!-- Themed Full-Screen Overlays -->
@@ -632,6 +633,10 @@
                     <span>DIGI-MEAT</span>
                     <strong style="color:#fff;">50 ₿</strong>
                 </div>
+                <div class="cyber-item" onclick="triggerAction('shop', 'egg')">
+                    <span>DIGITAMA (EGG)</span>
+                    <strong style="color:#fff;">100 ₿</strong>
+                </div>
                 <div class="cyber-item" onclick="triggerAction('shop', 'pill')">
                     <span>RECOVERY PILL</span>
                     <strong style="color:#fff;">30 ₿</strong>
@@ -640,6 +645,18 @@
                     <span>X-ANTIBODY</span>
                     <strong style="color:#fff;">5000 ₿</strong>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="roster-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// SELECT PARTNER</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="roster-container">
+                <!-- Dynamically populated via fetchRoster() -->
             </div>
         </div>
     </div>
@@ -695,6 +712,72 @@
                 fetchTasks();
             } else if (id === 'evo') {
                 fetchEvoTree();
+            } else if (id === 'roster') {
+                fetchRoster();
+            }
+        }
+
+        async function fetchRoster() {
+            const listDiv = document.getElementById('roster-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING LOCAL NETWORK... ]</div>';
+
+            try {
+                const res = await fetch('/twa/api/roster', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = '';
+                    if (data.roster.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">NO PARTNERS FOUND.</div>';
+                        return;
+                    }
+
+                    data.roster.forEach(d => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.style.opacity = d.is_active ? '0.5' : '1';
+                        item.style.pointerEvents = d.is_active ? 'none' : 'auto';
+                        item.innerHTML = `
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <img src="/twa/api/sprite/${d.name}" style="height:40px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 2px;">
+                                <div>
+                                    <strong>${d.name.toUpperCase()}</strong>
+                                    <div style="font-size:0.8em; opacity:0.8; margin-top:2px;">Level: ${d.level} | HP: ${d.current_hp}</div>
+                                </div>
+                            </div>
+                            <button class="cyber-btn" onclick="selectPartner(${d.id})">${d.is_active ? 'ACTIVE' : 'SELECT'}</button>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                } else {
+                    listDiv.innerHTML = '<div style="text-align:center; color:red;">ERROR CONNECTING TO SERVER</div>';
+                }
+            } catch (e) {
+                listDiv.innerHTML = '<div style="text-align:center; color:red;">NETWORK ERROR</div>';
+            }
+        }
+
+        async function selectPartner(digimonId) {
+            closeModals();
+            try {
+                const res = await fetch('/twa/api/roster/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData(), digimon_id: digimonId })
+                });
+
+                if (res.ok) {
+                    showToast('Partner switched successfully', 'SYSTEM UPDATE');
+                    await fetchVitals();
+                } else {
+                    showToast('Failed to switch partner', 'ERROR');
+                }
+            } catch (e) {
+                showToast('Network error while switching partner', 'ERROR');
             }
         }
 
@@ -1041,8 +1124,15 @@
 
         async function triggerAction(category, item) {
             closeModals();
-            if (category === 'shop' && item === 'meat') {
-                await requestAction('feed');
+            if (category === 'shop') {
+                if (item === 'meat') {
+                    await requestAction('feed');
+                } else if (item === 'egg') {
+                    await requestAction('buy_egg');
+                } else {
+                    if (tg && tg.showAlert) tg.showAlert(`Item ${item} is not yet fully implemented!`);
+                    else alert(`Item ${item} is not yet fully implemented!`);
+                }
             } else {
                 if (tg && tg.showAlert) tg.showAlert(`Action ${category}:${item} is not yet fully implemented!`);
                 else alert(`Action ${category}:${item} is not yet fully implemented!`);

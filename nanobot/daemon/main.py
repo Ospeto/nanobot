@@ -369,7 +369,21 @@ async def twa_digimon_action(request: Request):
         if action == "feed":
             res = state.feed_digimon(db, active.id, "Meat")
             db.commit()
-            return {"status": "success", "result": res}
+            return {"status": "success", "message": None, "result": res}
+        elif action == "buy_egg":
+            from nanobot.game.models import DigimonState
+            new_egg = DigimonState(
+                species="Digitama",
+                name="Digitama",
+                stage="Digitama",
+                attribute="Unknown",
+                element="Unknown",
+                level=0,
+                is_active=False
+            )
+            db.add(new_egg)
+            db.commit()
+            return {"status": "success", "message": "You bought a new Egg! It is available in your roster.", "result": {}}
         elif action == "play":
             # Very basic play implementation until we have complex minigames
             active.energy = max(0, active.energy - 10)
@@ -391,3 +405,64 @@ async def twa_digimon_action(request: Request):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "digimon_daemon"}
+
+
+@app.post("/twa/api/roster")
+async def twa_get_roster(request: Request):
+    """
+    Returns the full list of Digimon in the player's roster.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        all_digi = db.query(DigimonState).order_by(DigimonState.id).all()
+        roster = [
+            {
+                "id": d.id,
+                "name": d.name,
+                "stage": d.stage,
+                "level": d.level,
+                "current_hp": d.current_hp,
+                "is_active": d.is_active,
+            }
+            for d in all_digi
+        ]
+        return {"roster": roster}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/roster/select")
+async def twa_select_partner(request: Request):
+    """
+    Switch the active Digimon to the one specified by digimon_id.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    digimon_id = body.get("digimon_id")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    if not digimon_id:
+        raise HTTPException(status_code=400, detail="digimon_id required")
+
+    db = SessionLocal()
+    try:
+        target = state.set_active_digimon(db, int(digimon_id))
+        if not target:
+            raise HTTPException(status_code=404, detail="Digimon not found")
+        return {"status": "success", "active": target.name}
+    finally:
+        db.close()
+
