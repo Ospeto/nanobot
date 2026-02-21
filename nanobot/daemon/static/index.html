@@ -725,6 +725,39 @@
         </div>
     </div>
 
+    <div id="train-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// HYPER-TRAINING</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body shop-list">
+                <div style="margin-bottom: 15px; color: #fff; text-align: center; font-size: 0.9em; opacity: 0.8;">
+                    Complete 30-min IRL sessions to boost Core Stats! Or send a photo to the Telegram bot via /log for
+                    huge gains.
+                </div>
+                <div class="cyber-item" onclick="startTraining('workout')">
+                    <div>
+                        <strong>[ LIFT ]</strong>
+                        <div style="font-size:0.8em; opacity:0.8; margin-top:5px;">Workout for 30m (+2 STR)</div>
+                    </div>
+                </div>
+                <div class="cyber-item" onclick="startTraining('cardio')">
+                    <div>
+                        <strong>[ RUN ]</strong>
+                        <div style="font-size:0.8em; opacity:0.8; margin-top:5px;">Cardio for 30m (+2 AGI)</div>
+                    </div>
+                </div>
+                <div class="cyber-item" onclick="startTraining('study')">
+                    <div>
+                        <strong>[ FOCUS ]</strong>
+                        <div style="font-size:0.8em; opacity:0.8; margin-top:5px;">Study for 30m (+2 INT)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Custom Toast Notification Container -->
     <div id="cyber-toast" class="cyber-toast"></div>
 
@@ -1435,7 +1468,7 @@
                         Level: ${cachedVitals.level} | Stage: ${cachedVitals.stage || 'N/A'}
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em; border-bottom: 1px dashed rgba(79, 195, 205, 0.4); padding-bottom: 10px; margin-bottom: 10px;">
                     <div><strong>ATTRIBUTE:</strong> <span style="color:#fff;">${cachedVitals.attribute || 'N/A'}</span></div>
                     <div><strong>ELEMENT:</strong> <span style="color:#fff;">${cachedVitals.element || 'N/A'}</span></div>
                     <div><strong>HP:</strong> <span style="color:#fff;">${cachedVitals.hp}%</span></div>
@@ -1443,6 +1476,21 @@
                     <div><strong>HUNGER:</strong> <span style="color:#fff;">${cachedVitals.hunger || 0}/100</span></div>
                     <div><strong>ENERGY:</strong> <span style="color:#fff;">${cachedVitals.energy || 0}/100</span></div>
                     <div><strong>EXP:</strong> <span style="color:#fff;">${cachedVitals.exp || 0}</span></div>
+                </div>
+                <!-- Vitals -> RPG stats map -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; gap: 5px;">
+                    <div style="background: rgba(255, 60, 60, 0.1); border: 1px solid rgba(255, 60, 60, 0.5); padding: 5px; border-radius: 5px;">
+                        <div style="font-size: 0.8em; opacity: 0.8;">STR</div>
+                        <strong style="font-size: 1.2em; color: #ff5555;">${cachedVitals.str_stat || 0}</strong>
+                    </div>
+                    <div style="background: rgba(60, 255, 60, 0.1); border: 1px solid rgba(60, 255, 60, 0.5); padding: 5px; border-radius: 5px;">
+                        <div style="font-size: 0.8em; opacity: 0.8;">AGI</div>
+                        <strong style="font-size: 1.2em; color: #55ff55;">${cachedVitals.agi_stat || 0}</strong>
+                    </div>
+                    <div style="background: rgba(60, 150, 255, 0.1); border: 1px solid rgba(60, 150, 255, 0.5); padding: 5px; border-radius: 5px;">
+                        <div style="font-size: 0.8em; opacity: 0.8;">INT</div>
+                        <strong style="font-size: 1.2em; color: #55aaff;">${cachedVitals.int_stat || 0}</strong>
+                    </div>
                 </div>
             `;
         }
@@ -1458,34 +1506,8 @@
                 } else if (action === 'PLAY') {
                     requestAction('play');
                 } else if (action === 'TRAIN') {
-                    lcdState = 'POMO';
-                    if (!pomoInterval) {
-                        pomoInterval = setInterval(() => {
-                            if (pomoTime > 0) {
-                                pomoTime--;
-                                document.getElementById('pomo-time').innerText = formatTime(pomoTime);
-                            } else {
-                                clearInterval(pomoInterval);
-                                pomoInterval = null;
-
-                                fetch('/twa/api/claim_reward', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ initData: getInitData(), source: 'pomodoro', difficulty: 'hard' })
-                                }).then(res => res.json()).then(data => {
-                                    if (data.success) {
-                                        showToast(data.message, "TRAINING COMPLETE");
-                                        fetchVitals();
-                                    }
-                                }).catch(e => {
-                                    showToast("Pomodoro Training complete! +EXP", "TRAINING");
-                                });
-
-                                lcdState = 'IDLE';
-                                updateLcdUI();
-                            }
-                        }, 1000);
-                    }
+                    openModal('train');
+                    lcdState = 'IDLE';
                 } else if (action === 'QUEST') {
                     openModal('quest');
                     lcdState = 'IDLE';
@@ -1497,6 +1519,47 @@
                 lcdState = 'MENU';
             }
             updateLcdUI();
+        }
+
+        function startTraining(activityType) {
+            closeModals();
+            pomoTime = 30 * 60; // 30 mins
+            lcdState = 'POMO';
+            if (pomoInterval) {
+                clearInterval(pomoInterval);
+            }
+            document.getElementById('pomo-time').innerText = formatTime(pomoTime);
+            updateLcdUI();
+            
+            showToast(`Started ${activityType} training.. Don't quit!`, "TRAINING");
+
+            pomoInterval = setInterval(() => {
+                if (pomoTime > 0) {
+                    pomoTime--;
+                    document.getElementById('pomo-time').innerText = formatTime(pomoTime);
+                } else {
+                    clearInterval(pomoInterval);
+                    pomoInterval = null;
+
+                    fetch('/twa/api/activity', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ initData: getInitData(), activity_type: activityType })
+                    }).then(res => res.json()).then(data => {
+                        if (data.success) {
+                            showToast(data.message, "TRAINING COMPLETE");
+                            fetchVitals();
+                        } else {
+                            showToast(data.error || 'Failed to submit training', "ERROR");
+                        }
+                    }).catch(e => {
+                        showToast("Training complete but sync failed!", "ERROR");
+                    });
+
+                    lcdState = 'IDLE';
+                    updateLcdUI();
+                }
+            }, 1000);
         }
 
         fetchVitals();

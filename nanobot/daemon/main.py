@@ -83,6 +83,9 @@ async def twa_get_vitals(request: Request):
                     "stage": active.stage,
                     "attribute": active.attribute,
                     "element": active.element,
+                    "str_stat": active.str_stat,
+                    "agi_stat": active.agi_stat,
+                    "int_stat": active.int_stat,
                     "sprite": f"/twa/api/sprite/{sprite_name}",
                     "bits": inv.bits
                 }
@@ -321,6 +324,59 @@ async def twa_claim_reward(request: Request):
     except Exception as e:
         print(f"Claim endpoint error: {e}")
         return {"success": False, "error": "Internal Server Error during Loot Roll"}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/activity")
+async def twa_activity(request: Request):
+    """
+    Tier 1 Honor System hook for specific RPG stat training (Workout, Cardio, Study).
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    activity_type = body.get("activity_type", "study").lower()
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+    
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        active = state.get_active_digimon(db)
+        if not active or active.name == "Digitama":
+            return {"success": False, "error": "No valid active Digimon"}
+
+        old_level = active.level
+        active.exp += 5
+        active.level = 1 + (active.exp // 10)
+        active.bond = min(100, active.bond + 1)
+        
+        stat_msg = ""
+        if activity_type == "workout":
+            active.str_stat += 2
+            stat_msg = "+2 STR"
+        elif activity_type == "cardio":
+            active.agi_stat += 2
+            stat_msg = "+2 AGI"
+        else: # "study"
+            active.int_stat += 2
+            stat_msg = "+2 INT"
+
+        db.commit()
+        
+        msg = f"Training Complete! {stat_msg} & +5 EXP!"
+        if active.level > old_level:
+            msg += f" {active.name} grew to Level {active.level}!"
+            
+        return {
+            "success": True,
+            "message": msg
+        }
+    except Exception as e:
+        print(f"Activity endpoint error: {e}")
+        return {"success": False, "error": "Internal Server Error during Activity"}
     finally:
         db.close()
 

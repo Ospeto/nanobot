@@ -17,6 +17,11 @@ class DigimonState(Base):
     level = Column(Integer, default=1)
     exp = Column(Integer, default=0)
     
+    # RPG Stats
+    str_stat = Column(Integer, default=0)
+    agi_stat = Column(Integer, default=0)
+    int_stat = Column(Integer, default=0)
+    
     min_weight = Column(Integer, default=0)
     fields = Column(JSON, default=list) # e.g. ["Nature Spirits", "Virus Busters"]
 

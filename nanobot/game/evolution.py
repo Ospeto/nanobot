@@ -80,52 +80,95 @@ async def verify_evolution_requirements(db: Session, active, target_name: str, t
     }
     target_stage_clean = api_to_internal.get(target_stage_clean, target_stage_clean)
 
+    target_info = await Digipedia.get_digimon_info(target_name)
+    if not target_info:
+        return {"can_evolve": False, "reason": "Target Digimon data missing."}
+        
+    target_attribute = str(target_info.get("attributes", ["Unknown"])[0] if target_info.get("attributes") else "Unknown").lower()
+
+    # Calculate Dominant Stat with Tie-Breaker (INT -> STR -> AGI)
+    s, a, i = active.str_stat, active.agi_stat, active.int_stat
+    
+    # We want to pick the highest stat. On a tie, INT wins over STR, which wins over AGI.
+    # We can do this by assigning a fractional priority value: INT > STR > AGI
+    # INT: stat + 0.3
+    # STR: stat + 0.2
+    # AGI: stat + 0.1
+    i_priority = i + 0.3
+    s_priority = s + 0.2
+    a_priority = a + 0.1
+    
+    if i_priority > s_priority and i_priority > a_priority:
+        dominant = "int"
+    elif s_priority > a_priority:
+        dominant = "str"
+    else:
+        dominant = "agi"
+        
+    max_stat = max(s, a, i)
+        
     # Hidden / Special Evolution Check (X-Antibody)
     if target_name.endswith(" X") or "X-Antibody" in target_name:
         if "X-Antibody" in inv.items and inv.items["X-Antibody"] > 0:
-            return {"can_evolve": True, "reason": "X-Antibody Resonance Detected"}
+            if (s + a + i) >= (active.level * 3):
+                return {"can_evolve": True, "reason": "X-Antibody Resonance Detected"}
+            else:
+                return {"can_evolve": False, "reason": "Stats too low for X-Mutation"}
         else:
             return {"can_evolve": False, "reason": "Requires X-Antibody Item"}
             
-    # Crest Logic for specific branches (e.g., Flamedramon requires Digimental of Courage)
-    # We will expand this as needed, but for now allow specific text targets:
-    if "Crest" in target_name or "Magnamon" in target_name or "Flamedramon" in target_name:
+    # Crest Logic for specific branches
+    if "Crest" in target_name or "Magnamon" in target_name or "Flamedramon" in target_name or "Raidramon" in target_name:
         if any("Courage" in c for c in inv.digimentals + inv.crests):
+            # Check physical alignment matching lore
+            if "Flamedramon" in target_name and dominant != "str":
+                return {"can_evolve": False, "reason": "Requires STR Dominance"}
+            if "Raidramon" in target_name and dominant != "agi":
+                return {"can_evolve": False, "reason": "Requires AGI Dominance"}
+            if "Magnamon" in target_name and dominant != "int":
+                return {"can_evolve": False, "reason": "Requires INT Dominance"}
             return {"can_evolve": True, "reason": "Crest/Digimental Resonance Detected"}
         else:
             return {"can_evolve": False, "reason": "Requires Special Item"}
 
-    # Standard Math Firewall Checks
-    if target_stage_clean == "baby ii":
-        if active.level >= 3:
-            return {"can_evolve": True, "reason": "Level Requirement Met"}
-        return {"can_evolve": False, "reason": "Requires Level 3+"}
-        
-    elif target_stage_clean == "rookie":
-        if active.level >= 10 and active.bond >= 20:
-            return {"can_evolve": True, "reason": "Level & Bond Met"}
-        return {"can_evolve": False, "reason": "Req Level 10+, Bond 20+"}
-        
-    elif target_stage_clean == "champion":
-        if active.level >= 20 and active.bond >= 50:
-            return {"can_evolve": True, "reason": "Level & Bond Met"}
-        return {"can_evolve": False, "reason": "Req Level 20+, Bond 50+"}
-        
-    elif target_stage_clean == "ultimate":
-        if active.level >= 40 and active.bond >= 80:
-            return {"can_evolve": True, "reason": "Level & Bond Met"}
-        return {"can_evolve": False, "reason": "Req Level 40+, Bond 80+"}
-        
-    elif target_stage_clean == "mega" or target_stage_clean == "ultra":
-        if active.level >= 60 and active.bond >= 100:
-            return {"can_evolve": True, "reason": "Max Bond Reached"}
-        return {"can_evolve": False, "reason": "Req Level 60+, Bond 100"}
+    # Base Level Requirements by Stage
+    stage_reqs = {
+        "baby ii": 3,
+        "rookie": 10,
+        "champion": 20,
+        "ultimate": 40,
+        "mega": 60,
+        "ultra": 60
+    }
+    
+    req_level = stage_reqs.get(target_stage_clean)
+    if not req_level:
+        # Fallback
+        if active.level > 25: return {"can_evolve": True, "reason": "High Level Override"}
+        return {"can_evolve": False, "reason": "Unknown Stage"}
 
-    # Fallback to true for unknown targets that slip through purely based on high levels
-    if active.level > 25:
-        return {"can_evolve": True, "reason": "High Level Override"}
+    if active.level < req_level:
+        return {"can_evolve": False, "reason": f"Requires Level {req_level}+"}
         
-    return {"can_evolve": False, "reason": "Requirements Not Met"}
+    # Baby II has no attribute branching
+    if target_stage_clean == "baby ii":
+        return {"can_evolve": True, "reason": "Level Requirement Met"}
+        
+    # Branching Logic (Rookie and above)
+    if "vaccine" in target_attribute or "holy" in target_attribute or "light" in target_attribute:
+        if dominant == "str" and active.bond >= 30:
+            return {"can_evolve": True, "reason": "Vaccine Path Unlocked"}
+        return {"can_evolve": False, "reason": "Req STR Dominant & Bond 30+"}
+        
+    elif "virus" in target_attribute or "dark" in target_attribute or "demon" in target_attribute:
+        if dominant == "agi" and active.bond < 15:
+            return {"can_evolve": True, "reason": "Virus Path Unlocked"}
+        return {"can_evolve": False, "reason": "Req AGI Dominant & Bond < 15"}
+        
+    else: # Data / Default / Neutral
+        if dominant == "int" and 15 <= active.bond <= 29:
+            return {"can_evolve": True, "reason": "Data Path Unlocked"}
+        return {"can_evolve": False, "reason": "Req INT Dominant & Bond 15-29"}
 
 
 async def execute_evolution(db: Session, active, target_name: str) -> dict:

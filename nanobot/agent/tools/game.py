@@ -306,3 +306,68 @@ class AddAssignmentTool(Tool):
         
         status = "\n".join(results)
         return f"Assignment '{title}' (Due: {due_date or 'No date'}, Type: {task_type}):\n{status}\n\nTell the Tamer their assignment has been logged! Encourage them to start working on it!"
+
+
+class LogPhysicalActivityTool(Tool):
+    @property
+    def name(self) -> str:
+        return "log_activity_proof"
+        
+    @property
+    def description(self) -> str:
+        return "Used when the Tamer uploads a photo to prove they completed an IRL activity (Workout, Cardio, or Study). The AI MUST verify the photo matches the activity before calling this! Grants a massive +10 stat bonus and massive EXP."
+    
+    @property
+    def parameters(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "activity_type": {
+                    "type": "string",
+                    "description": "The type of activity proven by the photo.",
+                    "enum": ["workout", "cardio", "study"]
+                },
+                "proof_summary": {
+                    "type": "string",
+                    "description": "A short summary of what you saw in the photo to validate it (e.g. 'Saw gym equipment' or 'Saw code on screen')."
+                }
+            },
+            "required": ["activity_type", "proof_summary"]
+        }
+    
+    async def execute(self, activity_type: str, proof_summary: str, **kwargs) -> str:
+        if not HAS_GAME:
+            return "Game module not available."
+            
+        db = SessionLocal()
+        try:
+            digi = state.get_active_digimon(db)
+            if not digi:
+                return "The Tamer doesn't have an active Digimon to receive the stats."
+                
+            old_level = digi.level
+            digi.exp += 30 # Massive EXP
+            digi.level = 1 + (digi.exp // 10)
+            digi.bond = min(100, digi.bond + 5)
+            
+            bonus = 10
+            stat_name = ""
+            if activity_type == "workout":
+                digi.str_stat += bonus
+                stat_name = "STR"
+            elif activity_type == "cardio":
+                digi.agi_stat += bonus
+                stat_name = "AGI"
+            else: # study
+                digi.int_stat += bonus
+                stat_name = "INT"
+                
+            db.commit()
+            
+            msg = f"Incredible! Validated proof ({proof_summary}). Granted +{bonus} {stat_name} and +30 EXP to {digi.name}!"
+            if digi.level > old_level:
+                msg += f" {digi.name} skyrocketed to Level {digi.level}!"
+                
+            return msg
+        finally:
+            db.close()

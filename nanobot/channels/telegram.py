@@ -112,6 +112,7 @@ class TelegramChannel(BaseChannel):
         BotCommand("start", "Start the bot"),
         BotCommand("new", "Start a new conversation"),
         BotCommand("help", "Show available commands"),
+        BotCommand("log", "Log an IRL activity (e.g. /log workout) with a photo!"),
     ]
     
     def __init__(
