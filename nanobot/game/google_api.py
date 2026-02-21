@@ -135,3 +135,76 @@ class GoogleIntegration:
         except Exception as e:
             print(f"Error fetching Google Calendar: {e}")
             return []
+
+    def create_event(self, summary: str, start_time: str, end_time: str, description: str = ''):
+        if not self.authenticate():
+            return None
+            
+        try:
+            service = build('calendar', 'v3', credentials=self.creds, cache_discovery=False)
+            event = {
+                'summary': summary,
+                'description': description,
+                'start': {
+                    'dateTime': start_time,
+                },
+                'end': {
+                    'dateTime': end_time,
+                }
+            }
+            event_result = service.events().insert(calendarId='primary', body=event).execute()
+            return event_result
+        except Exception as e:
+            print(f"Error creating Calendar event: {e}")
+            return None
+
+    def find_freebusy(self, min_time: str, max_time: str):
+        if not self.authenticate():
+            return None
+            
+        try:
+            service = build('calendar', 'v3', credentials=self.creds, cache_discovery=False)
+            body = {
+                "timeMin": min_time,
+                "timeMax": max_time,
+                "items": [{"id": "primary"}]
+            }
+            eventsResult = service.freebusy().query(body=body).execute()
+            return eventsResult.get('calendars', {}).get('primary', {}).get('busy', [])
+        except Exception as e:
+            print(f"Error checking FreeBusy: {e}")
+            return None
+
+    def update_event(self, event_id: str, summary: str = None, start_time: str = None, end_time: str = None, description: str = None):
+        if not self.authenticate():
+            return None
+            
+        try:
+            service = build('calendar', 'v3', credentials=self.creds, cache_discovery=False)
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+            if summary is not None:
+                event['summary'] = summary
+            if description is not None:
+                event['description'] = description
+            if start_time is not None:
+                event['start']['dateTime'] = start_time
+            if end_time is not None:
+                event['end']['dateTime'] = end_time
+                
+            updated_event = service.events().update(calendarId='primary', eventId=event_id, body=event).execute()
+            return updated_event
+        except Exception as e:
+            print(f"Error updating Calendar event: {e}")
+            return None
+
+    def delete_event(self, event_id: str) -> bool:
+        if not self.authenticate():
+            return False
+            
+        try:
+            service = build('calendar', 'v3', credentials=self.creds, cache_discovery=False)
+            service.events().delete(calendarId='primary', eventId=event_id).execute()
+            return True
+        except Exception as e:
+            print(f"Error deleting Calendar event {event_id}: {e}")
+            return False
