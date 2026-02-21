@@ -307,60 +307,67 @@ class AgentLoop:
                     await asyncio.sleep(3600)
                     continue
                     
-                tasks = notion.fetch_mas_deadlines()
-                db = SessionLocal()
-                try:
-                    for t in tasks:
-                        if not t["due_date"]: continue
-                        try:
-                            due_str = t["due_date"]
-                            if len(due_str) == 10: # YYYY-MM-DD
-                                due = datetime.strptime(due_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                            else:
-                                due = datetime.fromisoformat(due_str.replace('Z', '+00:00'))
-                        except Exception:
-                            continue
+                tasks = await asyncio.to_thread(notion.fetch_mas_deadlines)
+                
+                def _check_and_mark_mas_alert(tid: str, title: str, task_type: str) -> bool:
+                    db = SessionLocal()
+                    try:
+                        state = db.query(models.TaskSyncState).filter_by(id=tid).first()
+                        if not state:
+                            state = models.TaskSyncState(id=tid, source="notion", title=title, status="pending", task_type=task_type)
+                            db.add(state)
                             
-                        now = datetime.now(timezone.utc)
-                        days_left = (due - now).days
+                        skip = False
+                        if state.last_notified_at:
+                            try:
+                                last = datetime.fromisoformat(state.last_notified_at)
+                                if (datetime.utcnow() - last).total_seconds() < 86400: # 1 msg per day
+                                    skip = True
+                            except Exception:
+                                pass
+                                
+                        if not skip:
+                            state.last_notified_at = datetime.utcnow().isoformat()
+                            db.commit()
+                            return True
+                        return False
+                    finally:
+                        db.close()
+                
+                for t in tasks:
+                    if not t["due_date"]: continue
+                    try:
+                        due_str = t["due_date"]
+                        if len(due_str) == 10: # YYYY-MM-DD
+                            due = datetime.strptime(due_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                        else:
+                            due = datetime.fromisoformat(due_str.replace('Z', '+00:00'))
+                    except Exception:
+                        continue
                         
-                        is_urgent = False
-                        if t["type"].lower() == "exam" and 0 <= days_left <= 7:
-                            is_urgent = True
-                        elif t["type"].lower() in ["assignment", "task"] and 0 <= days_left <= 3:
-                            is_urgent = True
-                            
-                        if is_urgent:
-                            state = db.query(models.TaskSyncState).filter_by(id=t["id"]).first()
-                            if not state:
-                                state = models.TaskSyncState(id=t["id"], source="notion", title=t["title"], status="pending", task_type=t["type"])
-                                db.add(state)
-                                
-                            skip = False
-                            if state.last_notified_at:
-                                try:
-                                    last = datetime.fromisoformat(state.last_notified_at)
-                                    if (datetime.utcnow() - last).total_seconds() < 86400: # 1 msg per day
-                                        skip = True
-                                except Exception:
-                                    pass
-                                    
-                            if not skip:
-                                state.last_notified_at = datetime.utcnow().isoformat()
-                                db.commit()
-                                
-                                alert_text = f"PROACTIVE SYSTEM ALERT: Look at my schedule, I have an upcoming {t['type']} called '{t['title']}' due on {t['due_date']} (in {days_left} days). Please proactively remind me about it right now and encourage me to study/work! Act like my Digimon partner panicking about my success."
-                                msg = InboundMessage(
-                                    channel=channel,
-                                    sender_id="system",
-                                    chat_id=chat_id,
-                                    content=alert_text
-                                )
-                                logger.info(f"Triggering proactive MAS alert for {t['title']}")
-                                await self.bus.publish_inbound(msg)
-                                break # Process one alert per loop to avoid spam
-                finally:
-                    db.close()
+                    now = datetime.now(timezone.utc)
+                    days_left = (due - now).days
+                    
+                    is_urgent = False
+                    if t["type"].lower() == "exam" and 0 <= days_left <= 7:
+                        is_urgent = True
+                    elif t["type"].lower() in ["assignment", "task"] and 0 <= days_left <= 3:
+                        is_urgent = True
+                        
+                    if is_urgent:
+                        should_alert = await asyncio.to_thread(_check_and_mark_mas_alert, t["id"], t["title"], t["type"])
+                        if should_alert:
+                            clean_title = str(t['title']).replace('{', '{{').replace('}', '}}')
+                            alert_text = f"PROACTIVE SYSTEM ALERT: Look at my schedule, I have an upcoming {t['type']} called '{clean_title}' due on {t['due_date']} (in {days_left} days). Stop whatever you are doing and proactively act as my Study Guide! Break down what I need to do, ask me what topics I am weak at, and suggest we schedule focus blocks on the Calendar to prepare. Act like my smart Digimon partner urging me to success!"
+                            msg = InboundMessage(
+                                channel=channel,
+                                sender_id="system",
+                                chat_id=chat_id,
+                                content=alert_text
+                            )
+                            logger.info(f"Triggering proactive MAS alert for {clean_title}")
+                            await self.bus.publish_inbound(msg)
+                            break # Process one alert per loop to avoid spam
             except Exception as e:
                 logger.error(f"Proactive MAS loop error: {e}")
                 
@@ -436,17 +443,48 @@ class AgentLoop:
             except Exception as e:
                 logger.error(f"Proactive Calendar loop error: {e}")
 
+    async def _proactive_daily_scheduler_loop(self):
+        """Background task to proactively recommend a daily time-blocked schedule."""
+        while self._running:
+            try:
+                # Run once a day (check every 24 hours essentially, or immediately upon boot with some delay)
+                await asyncio.sleep(600) # Boot wait
+                
+                sessions = self.sessions.list_sessions()
+                tg_session = next((s for s in sessions if s["key"].startswith("telegram:")), None)
+                if not tg_session:
+                    await asyncio.sleep(3600)
+                    continue
+                    
+                channel, chat_id = tg_session["key"].split(":", 1)
+                
+                alert_text = "DAILY PROACTIVE ROUTINE: It is time to plan the day! Use your ListTasksTool and list_calendar tools. Analyze my unscheduled tasks and upcoming Notion deadlines against my calendar free time. Suggest a highly optimized time-blocking schedule for the next 24-48 hours. Ask me if you should go ahead and use BlockTimeTool to lock these into my calendar!"
+                msg = InboundMessage(
+                    channel=channel,
+                    sender_id="system",
+                    chat_id=chat_id,
+                    content=alert_text
+                )
+                logger.info("Triggering Daily Proactive Scheduler Routine")
+                await self.bus.publish_inbound(msg)
+                
+            except Exception as e:
+                logger.error(f"Proactive Daily Scheduler loop error: {e}")
+                
+            # Sleep 24 hours before recommending again
+            await asyncio.sleep(86400)
+
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
         self._running = True
         await self._connect_mcp()
         logger.info("Agent loop started")
         
-        # Start MAS proactive checker
+        # Start proactive background tasks
+        asyncio.create_task(self._proactive_message_loop())
         asyncio.create_task(self._proactive_mas_alerts_loop())
-        
-        # Start Calendar proactive checker
         asyncio.create_task(self._proactive_calendar_alerts_loop())
+        asyncio.create_task(self._proactive_daily_scheduler_loop())
 
         while self._running:
             try:
