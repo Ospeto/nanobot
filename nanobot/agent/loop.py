@@ -131,7 +131,7 @@ class AgentLoop:
             self.tools.register(CronTool(self.cron_service))
         # Game tools (for Digimon companion)
         try:
-            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool
+            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool
             from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
             from nanobot.agent.tools.init import InitDigimonTool
             
@@ -139,6 +139,7 @@ class AgentLoop:
             self.tools.register(HealTool())
             self.tools.register(PlayTool())
             self.tools.register(ListTasksTool())
+            self.tools.register(CompleteTaskTool())
             self.tools.register(ManageMemoryGraphTool())
             self.tools.register(SearchMemoryGraphTool())
             self.tools.register(InitDigimonTool())

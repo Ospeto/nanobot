@@ -175,8 +175,8 @@ class ListTasksTool(Tool):
             if not tasks:
                 return f"You have ZERO pending tasks{' for ' + source_filter if source_filter else ''}! Good job! Tell the user they are completely clear."
                 
-            notion_tasks = [t.title for t in tasks if t.source == 'notion']
-            google_tasks = [t.title for t in tasks if t.source == 'google_tasks']
+            notion_tasks = [f"{t.title} (ID: {t.id})" for t in tasks if t.source == 'notion']
+            google_tasks = [f"{t.title} (ID: {t.id})" for t in tasks if t.source == 'google_tasks']
             
             output = []
             if notion_tasks:
@@ -186,5 +186,67 @@ class ListTasksTool(Tool):
             
             task_list = "\n\n".join(output)
             return f"PENDING TASKS:\n{task_list}\n\nTell the human they need to finish these to gain EXP and Food!"
+        finally:
+            db.close()
+
+
+class CompleteTaskTool(Tool):
+    @property
+    def name(self) -> str:
+        return "complete_task"
+        
+    @property
+    def description(self) -> str:
+        return "Mark a task as completed (deleted). Use the Exact ID from the list_tasks tool."
+        
+    @property
+    def parameters(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "string",
+                    "description": "The EXACT ID of the task from the list_tasks tool output."
+                },
+                "source": {
+                    "type": "string",
+                    "description": "The exact source string ('notion' or 'google_tasks') for the task."
+                }
+            },
+            "required": ["task_id", "source"]
+        }
+        
+    async def execute(self, task_id: str, source: str, **kwargs) -> str:
+        if not HAS_GAME:
+            return "Game module not available."
+        db = SessionLocal()
+        try:
+            from nanobot.game import models
+            from nanobot.game.combat import Enemy, resolve_combat
+            
+            task = db.query(models.TaskSyncState).filter(models.TaskSyncState.id == task_id, models.TaskSyncState.source == source).first()
+            if not task:
+                return f"Error: No pending {source} task with ID {task_id} found."
+                
+            success = False
+            if source == "notion":
+                from nanobot.game.notion_api import NotionIntegration
+                notion = NotionIntegration()
+                success = notion.complete_task(task_id)
+            elif source == "google_tasks":
+                from nanobot.game.google_api import GoogleIntegration
+                google = GoogleIntegration()
+                success = google.complete_task(task_id)
+            else:
+                return f"Unknown source: {source}"
+                
+            if success:
+                task.status = "completed"
+                enemy = Enemy(task_source=source, task_id=task_id, title=task.title, status="completed")
+                resolve_combat(db, enemy)
+                db.commit()
+                return f"Successfully completed/deleted the task '{task.title}'! You slayed this Dark Data!"
+            else:
+                return f"Failed to complete task '{task.title}'. API error occurred."
         finally:
             db.close()
