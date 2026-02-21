@@ -47,9 +47,13 @@ class GoogleIntegration:
             if not items:
                 return []
                 
-            tasklist_id = items[0]['id']
-            tasks_result = service.tasks().list(tasklist=tasklist_id, showCompleted=False).execute()
-            return tasks_result.get('items', [])
+            all_tasks = []
+            for tasklist in items:
+                tasklist_id = tasklist['id']
+                tasks_result = service.tasks().list(tasklist=tasklist_id, showCompleted=False).execute()
+                all_tasks.extend(tasks_result.get('items', []))
+                
+            return all_tasks
         except Exception as e:
             print(f"Error fetching Google Tasks: {e}")
             return []
@@ -65,11 +69,20 @@ class GoogleIntegration:
             if not items:
                 return False
                 
-            tasklist_id = items[0]['id']
-            task = service.tasks().get(tasklist=tasklist_id, task=task_id).execute()
-            task['status'] = 'completed'
-            service.tasks().update(tasklist=tasklist_id, task=task_id, body=task).execute()
-            return True
+            for tasklist in items:
+                tasklist_id = tasklist['id']
+                try:
+                    # We might get a 404 if the task is not in this specific list,
+                    # so we catch errors inside the loop.
+                    task = service.tasks().get(tasklist=tasklist_id, task=task_id).execute()
+                    task['status'] = 'completed'
+                    service.tasks().update(tasklist=tasklist_id, task=task_id, body=task).execute()
+                    return True
+                except Exception:
+                    continue # Not in this list, try the next one
+                    
+            print(f"Task {task_id} not found in any Google Tasks list.")
+            return False
         except Exception as e:
             print(f"Error completing Google Task {task_id}: {e}")
             return False

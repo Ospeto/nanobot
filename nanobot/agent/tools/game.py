@@ -151,13 +151,8 @@ class ListTasksTool(Tool):
     def parameters(self) -> dict:
         return {
             "type": "object",
-            "properties": {
-                "source_filter": {
-                    "type": "string",
-                    "description": "Required: Filter by 'notion' or 'google_tasks' or 'all'."
-                }
-            },
-            "required": ["source_filter"]
+            "properties": {},
+            "required": []
         }
         
     async def execute(self, source_filter: str | None = None, **kwargs) -> str:
@@ -210,7 +205,7 @@ class CompleteTaskTool(Tool):
                 },
                 "source": {
                     "type": "string",
-                    "description": "The exact source string ('notion' or 'google_tasks') for the task."
+                    "description": "The exact source string ('google_tasks') for the task."
                 }
             },
             "required": ["task_id", "source"]
@@ -223,22 +218,22 @@ class CompleteTaskTool(Tool):
         try:
             from nanobot.game import models
             from nanobot.game.combat import Enemy, resolve_combat
+            import logging
             
+            logging.info(f"Attempting CompleteTaskTool with task_id={task_id}, source={source}")
             task = db.query(models.TaskSyncState).filter(models.TaskSyncState.id == task_id, models.TaskSyncState.source == source).first()
             if not task:
+                logging.info(f"Task ID {task_id} not found in DB!")
                 return f"Error: No pending {source} task with ID {task_id} found."
                 
             success = False
-            if source == "notion":
-                from nanobot.game.notion_api import NotionIntegration
-                notion = NotionIntegration()
-                success = notion.complete_task(task_id)
-            elif source == "google_tasks":
+            if source == "google_tasks":
                 from nanobot.game.google_api import GoogleIntegration
                 google = GoogleIntegration()
                 success = google.complete_task(task_id)
+                logging.info(f"Google API complete_task returned: {success}")
             else:
-                return f"Unknown source: {source}"
+                return f"Unknown source (only google_tasks supported): {source}"
                 
             if success:
                 task.status = "completed"
@@ -248,5 +243,9 @@ class CompleteTaskTool(Tool):
                 return f"Successfully completed/deleted the task '{task.title}'! You slayed this Dark Data!"
             else:
                 return f"Failed to complete task '{task.title}'. API error occurred."
+        except Exception as e:
+            import logging
+            logging.error(f"CompleteTaskTool exception: {e}")
+            return f"Failed to complete task. Internal error: {str(e)}"
         finally:
             db.close()
