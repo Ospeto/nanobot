@@ -367,6 +367,64 @@ class AgentLoop:
             # Sleep for an hour before checking again
             await asyncio.sleep(3600)
 
+    async def _proactive_calendar_alerts_loop(self):
+        """Background task to poll Google Calendar and trigger real-time panic alerts."""
+        while self._running:
+            try:
+                await asyncio.sleep(60) # check roughly every minute
+                
+                sessions = self.sessions.list_sessions()
+                tg_session = next((s for s in sessions if s["key"].startswith("telegram:")), None)
+                if not tg_session:
+                    continue
+                    
+                channel, chat_id = tg_session["key"].split(":", 1)
+                
+                from nanobot.game.google_api import GoogleIntegration
+                google = GoogleIntegration()
+                events = google.get_upcoming_events()
+                if not events:
+                    continue
+                    
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc)
+                
+                from nanobot.game.database import SessionLocal
+                from nanobot.game import models
+                db = SessionLocal()
+                try:
+                    for e in events:
+                        start_str = e['start'].get('dateTime')
+                        if not start_str: 
+                            continue # Ignore all-day events
+                        
+                        start_time = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                        seconds_until = (start_time - now).total_seconds()
+                        
+                        # If starting in less than 5 minutes
+                        if 0 <= seconds_until <= 300:
+                            state_id = f"cal_alert_{e['id']}"
+                            state = db.query(models.TaskSyncState).filter_by(id=state_id).first()
+                            if not state:
+                                state = models.TaskSyncState(id=state_id, source="calendar", title=e.get('summary', ''), status="alerted", task_type="event")
+                                db.add(state)
+                                db.commit()
+                                
+                                alert_text = f"PROACTIVE SYSTEM ALERT: TAMER! A time block called '{e.get('summary', 'Unknown')}' is starting in {int(seconds_until//60)} minutes! This is your Combat Zone! Tell the Tamer to drop everything and FOCUS!"
+                                msg = InboundMessage(
+                                    channel=channel,
+                                    sender_id="system",
+                                    chat_id=chat_id,
+                                    content=alert_text
+                                )
+                                logger.info(f"Triggering proactive Calendar alert for {e.get('summary', 'Unknown')}")
+                                await self.bus.publish_inbound(msg)
+                                break
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"Proactive Calendar loop error: {e}")
+
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
         self._running = True
@@ -375,6 +433,9 @@ class AgentLoop:
         
         # Start MAS proactive checker
         asyncio.create_task(self._proactive_mas_alerts_loop())
+        
+        # Start Calendar proactive checker
+        asyncio.create_task(self._proactive_calendar_alerts_loop())
 
         while self._running:
             try:
