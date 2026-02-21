@@ -468,28 +468,35 @@ class AgentLoop:
                     # Pick the most imminent suggestion
                     s = suggestions[0]
                     
-                    message = f"TAMER! 🎓 I've been analyzing your schedule. You have {s['course']} coming up!\n\n"
-                    message += f"Smart Study Window: {s['suggested_prep']}\n"
+                    urgency = s.get("urgency", "MEDIUM")
+                    alert_text = f"PROACTIVE STUDY ALERT: Tamer has an upcoming {s.get('type', 'task')}: '{s['course']}'"
+                    alert_text += f" (urgency: {urgency}, due in {s.get('days_until', '?')} days)."
                     if s["materials"]:
-                        message += "I found these materials for you:\n"
-                        for m in s["materials"]:
-                            message += f"🔗 {m['title']}: {m['url']}\n"
+                        alert_text += f" {len(s['materials'])} study materials are available."
+                    alert_text += " Proactively warn them and suggest a study plan!"
                     
-                    message += "\nShall I block this time on your calendar for a focused study session?"
-                    
-                    # Send message to all active sessions
-                    active_sessions = self.sessions.list_active_sessions()
-                    for session in active_sessions:
-                        await self.bus.publish_outbound(OutboundMessage(
-                            session_id=session.id,
-                            text=message
-                        ))
+                    # Use the same pattern as other proactive loops
+                    sessions = self.sessions.list_sessions()
+                    if sessions:
+                        session_key = sessions[0].get("key", "")
+                        parts = session_key.split(":", 1)
+                        if len(parts) == 2:
+                            channel, chat_id = parts
+                            msg = InboundMessage(
+                                channel=channel,
+                                sender_id="system",
+                                chat_id=chat_id,
+                                content=alert_text
+                            )
+                            logger.info(f"Triggering proactive study alert for {s['course']}")
+                            await self.bus.publish_inbound(msg)
                 
                 # Run every 4 hours
                 await asyncio.sleep(4 * 3600)
             except Exception as e:
                 logger.error(f"Error in proactive study loop: {e}")
                 await asyncio.sleep(300)
+
 
     async def _proactive_daily_scheduler_loop(self):
         """Background task to proactively recommend a daily time-blocked schedule."""
