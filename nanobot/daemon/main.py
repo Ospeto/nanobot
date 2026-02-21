@@ -203,35 +203,38 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
                 "image": f"/twa/api/sprite/{prev_name}" if prev_name else None
             }
         
-        # take up to 2 next evolutions
-        next_list = []
-        for n in next_evos:
-            target_name = n.get("name")
-            if not target_name:
-                continue
+        async def fetch_tree(d_name: str, current_depth: int, max_depth: int = 3):
+            d_info = await Digipedia.get_digimon_info(d_name)
+            if not d_info or current_depth > max_depth:
+                return []
+            
+            evos = []
+            for n in d_info.get("evolvesTo", []):
+                t_name = n.get("name")
+                if not t_name or not n.get("canon"):
+                    continue
                 
-            # Filter non-canon for a cleaner tree
-            if not n.get("canon"):
-                continue
-            
-            valid_image = f"/twa/api/sprite/{target_name}"
-            
-            # Check for AI-generated rule in DB
-            rule = db.query(EvolutionRule).filter_by(base_digimon=active.name, target_digimon=target_name).first()
-            if rule:
-                cond = rule.condition_string
-            else:
-                # Trigger LLM Generation Background Task
-                background_tasks.add_task(generate_evolution_conditions, active.name, target_name)
-                cond = "Analyzing Data..."
+                cond = "Hidden Req."
+                if current_depth == 1:
+                    rule = db.query(EvolutionRule).filter_by(base_digimon=d_name, target_digimon=t_name).first()
+                    if rule:
+                        cond = rule.condition_string
+                    else:
+                        background_tasks.add_task(generate_evolution_conditions, d_name, t_name)
+                        cond = "Analyzing Data..."
+                
+                evos.append({
+                    "name": t_name,
+                    "condition": cond,
+                    "image": f"/twa/api/sprite/{t_name}",
+                    "next": await fetch_tree(t_name, current_depth + 1, max_depth)
+                })
+                # Cap the number of branches per node to keep it readable (3 for direct children, 1 for grandchildren)
+                if len(evos) >= (3 if current_depth == 1 else 1):
+                    break
+            return evos
 
-            next_list.append({
-                "name": target_name,
-                "condition": cond,
-                "image": valid_image
-            })
-            if len(next_list) >= 2:
-                break
+        next_list = await fetch_tree(active.name, 1, 3)
             
         return {
             "current": active.name,

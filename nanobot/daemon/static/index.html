@@ -824,19 +824,28 @@
                         </div>
                     `;
 
-                    if (data.next && data.next.length > 0) {
-                        html += `<div style="margin: 10px 0; color: #4fc3cd;">▼ ▼ ▼</div>
-                                 <div style="display: flex; gap: 15px; justify-content: center; width: 100%;">`;
-                        data.next.forEach(n => {
-                            html += `
-                                <div class="evo-node" style="flex: 1; max-width: 140px;">
-                                    ${n.image ? `<img src="${n.image}" style="height:50px; background: rgba(255,255,255,0.8); border-radius: 10px; padding: 4px; border: 1px solid rgba(79,195,205,0.5);">` : ''}
-                                    <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
-                                    <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Unknown Req.'}</div>
+                    function renderTree(nodes, isRoot = false) {
+                        if (!nodes || nodes.length === 0) return '';
+                        let branchHtml = `<div style="display: flex; gap: 15px; justify-content: center; width: 100%; margin-top: ${isRoot ? '0' : '15px'};">`;
+                        nodes.forEach(n => {
+                            branchHtml += `
+                                <div style="display: flex; flex-direction: column; align-items: center; max-width: 140px;">
+                                    <div class="evo-node" style="width: 100%; box-sizing: border-box;">
+                                        ${n.image ? `<img src="${n.image}" style="height:50px; background: rgba(255,255,255,0.8); border-radius: 10px; padding: 4px; border: 1px solid rgba(79,195,205,0.5);">` : ''}
+                                        <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
+                                        <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Hidden Req.'}</div>
+                                    </div>
+                                    ${n.next && n.next.length > 0 ? `<div style="margin: 10px 0; color: #4fc3cd; font-size: 0.8em; opacity: 0.6;">▼</div>` + renderTree(n.next) : ''}
                                 </div>
                             `;
                         });
-                        html += `</div>`;
+                        branchHtml += `</div>`;
+                        return branchHtml;
+                    }
+
+                    if (data.next && data.next.length > 0) {
+                        html += `<div style="margin: 10px 0; color: #4fc3cd;">▼ ▼ ▼</div>`;
+                        html += renderTree(data.next, true);
                     } else if (data.current !== "Digitama") {
                         html += `
                             <div style="margin: 15px 0; color: #4fc3cd;">▼</div>
