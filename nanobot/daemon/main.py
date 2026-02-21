@@ -192,24 +192,29 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
         if not info:
             return {"current": active.name, "prev": None, "next": []}
             
-        prior = info.get("priorEvolutions", [])
-        next_evos = info.get("nextEvolutions", [])
+        prior = info.get("evolvesFrom", [])
+        next_evos = info.get("evolvesTo", [])
         
         prev_data = None
         if prior:
+            prev_name = prior[0].get("name")
             prev_data = {
-                "name": prior[0].get("digimon"),
-                "image": prior[0].get("image")
+                "name": prev_name,
+                "image": f"/twa/api/sprite/{prev_name}" if prev_name else None
             }
         
         # take up to 2 next evolutions
         next_list = []
         for n in next_evos:
-            valid_image = n.get("image")
-            if not valid_image:
+            target_name = n.get("name")
+            if not target_name:
                 continue
                 
-            target_name = n.get("digimon")
+            # Filter non-canon for a cleaner tree
+            if not n.get("canon"):
+                continue
+            
+            valid_image = f"/twa/api/sprite/{target_name}"
             
             # Check for AI-generated rule in DB
             rule = db.query(EvolutionRule).filter_by(base_digimon=active.name, target_digimon=target_name).first()
@@ -230,7 +235,7 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
             
         return {
             "current": active.name,
-            "current_image": info.get("images", [{}])[0].get("href") if info.get("images") else None,
+            "current_image": f"/twa/api/sprite/{active.name}",
             "prev": prev_data,
             "next": next_list
         }
