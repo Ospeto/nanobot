@@ -39,6 +39,18 @@ def add_digimon(db: Session, digimon: schemas.DigimonCreate) -> models.DigimonSt
         
     return db_digimon
 
+def feed_digimon(db: Session, digimon_id: int, item_name: str) -> dict:
+    digi = db.query(models.DigimonState).filter(models.DigimonState.id == digimon_id).first()
+    if not digi:
+        return {"success": False, "message": "No such Digimon"}
+        
+    recovered = 15
+    digi.hunger = min(100, digi.hunger + recovered)
+    digi.energy = min(100, digi.energy + 5)
+    
+    db.commit()
+    return {"success": True, "hunger_recovered": recovered, "message": f"Fed {digi.name} {item_name}!"}
+
 def update_guardrails(db: Session, input_tokens: int, output_tokens: int, cost: float):
     date_str = datetime.utcnow().strftime("%Y-%m-%d")
     rail = db.query(models.GuardrailState).filter(models.GuardrailState.date_str == date_str).first()

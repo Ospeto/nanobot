@@ -33,6 +33,7 @@ class DigimonState(Base):
     equipped_items = Column(JSON, default=list)
     
     is_active = Column(Boolean, default=False)
+    location = Column(String, default="roster")
     created_at = Column(String, default=lambda: datetime.utcnow().isoformat())
     last_updated = Column(String, default=lambda: datetime.utcnow().isoformat())
     hatch_time = Column(String, nullable=True)

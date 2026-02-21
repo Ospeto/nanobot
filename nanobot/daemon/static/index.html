@@ -582,9 +582,11 @@
     <!-- Software App Navigation (bottom row) -->
     <div class="software-nav" id="software-nav">
         <div class="nav-btn active" onclick="closeModals()">HOME</div>
-        <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
-        <div class="nav-btn" onclick="openModal('evo')">EVO</div>
         <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
+        <div class="nav-btn" onclick="openModal('roster')">TEAM</div>
+        <div class="nav-btn" onclick="openModal('farm')">FARM</div>
+        <div class="nav-btn" onclick="openModal('incubator')">EGGS</div>
+        <div class="nav-btn" onclick="openModal('dterm')">ITEMS</div>
     </div>
 
     <!-- Themed Full-Screen Overlays -->
@@ -632,6 +634,10 @@
                     <span>DIGI-MEAT</span>
                     <strong style="color:#fff;">50 ₿</strong>
                 </div>
+                <div class="cyber-item" onclick="triggerAction('shop', 'egg')">
+                    <span>DIGITAMA (EGG)</span>
+                    <strong style="color:#fff;">100 ₿</strong>
+                </div>
                 <div class="cyber-item" onclick="triggerAction('shop', 'pill')">
                     <span>RECOVERY PILL</span>
                     <strong style="color:#fff;">30 ₿</strong>
@@ -640,6 +646,54 @@
                     <span>X-ANTIBODY</span>
                     <strong style="color:#fff;">5000 ₿</strong>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="roster-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// PARTNER ROSTER</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="roster-container">
+                <!-- Dynamically populated via fetchRoster() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="farm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// DIGIFARM</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="farm-container">
+                <!-- Dynamically populated via fetchFarm() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="incubator-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// INCUBATOR</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="incubator-container">
+                <!-- Dynamically populated via fetchIncubator() -->
+            </div>
+        </div>
+    </div>
+
+    <div id="dterm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// D-TERMINAL</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body roster-list" id="dterm-container">
+                <!-- Dynamically populated via fetchInventory() -->
             </div>
         </div>
     </div>
@@ -695,6 +749,215 @@
                 fetchTasks();
             } else if (id === 'evo') {
                 fetchEvoTree();
+            } else if (id === 'roster') {
+                fetchRoster();
+            } else if (id === 'farm') {
+                fetchFarm();
+            } else if (id === 'incubator') {
+                fetchIncubator();
+            } else if (id === 'dterm') {
+                fetchInventory();
+            }
+        }
+
+        async function fetchRoster() {
+            const listDiv = document.getElementById('roster-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING LOCAL NETWORK... ]</div>';
+
+            try {
+                const res = await fetch('/twa/api/roster', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = '';
+                    if (data.roster.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">NO PARTNERS FOUND.</div>';
+                        return;
+                    }
+
+                    data.roster.forEach(d => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.style.opacity = d.is_active ? '0.5' : '1';
+                        item.style.pointerEvents = d.is_active ? 'none' : 'auto';
+                        item.innerHTML = `
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <img src="/twa/api/sprite/${d.name}" style="height:40px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 2px;">
+                                <div>
+                                    <strong>${d.name.toUpperCase()}</strong>
+                                    <div style="font-size:0.8em; opacity:0.8; margin-top:2px;">Level: ${d.level} | HP: ${d.current_hp}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:5px; align-items: flex-end;">
+                                <button class="cyber-btn" style="font-size: 0.6em; width: 100%;" onclick="selectPartner(${d.id})">${d.is_active ? 'ACTIVE' : 'SELECT'}</button>
+                                ${d.name === 'Digitama'
+                                ? `<button class="cyber-btn" style="font-size: 0.6em; width: 100%;" onclick="transferDigimon(${d.id}, 'incubator')">TO INCUBATOR</button>`
+                                : `<button class="cyber-btn" style="font-size: 0.6em; width: 100%;" onclick="transferDigimon(${d.id}, 'farm')">TO FARM</button>`
+                            }
+                            </div>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                } else {
+                    listDiv.innerHTML = '<div style="text-align:center; color:red;">ERROR CONNECTING TO SERVER</div>';
+                }
+            } catch (e) {
+                listDiv.innerHTML = '<div style="text-align:center; color:red;">NETWORK ERROR</div>';
+            }
+        }
+
+        async function fetchFarm() {
+            const listDiv = document.getElementById('farm-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING DIGIFARM... ]</div>';
+            try {
+                const res = await fetch('/twa/api/farm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = '';
+                    if (data.farm.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">FARM IS EMPTY.</div>';
+                        return;
+                    }
+                    data.farm.forEach(d => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <img src="/twa/api/sprite/${d.name}" style="height:40px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 2px;">
+                                <div>
+                                    <strong>${d.name.toUpperCase()}</strong>
+                                    <div style="font-size:0.8em; opacity:0.8; margin-top:2px;">Level: ${d.level} | HP: ${d.current_hp}</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                                <button class="cyber-btn" style="font-size: 0.6em;" onclick="transferDigimon(${d.id}, 'roster')">TO ROSTER</button>
+                            </div>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function fetchIncubator() {
+            const listDiv = document.getElementById('incubator-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ CHECKING EGGS... ]</div>';
+            try {
+                const res = await fetch('/twa/api/incubator', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = '';
+                    if (data.incubator.length === 0) {
+                        listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">NO EGGS.</div>';
+                        return;
+                    }
+                    data.incubator.forEach(d => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                                <img src="/twa/api/sprite/${d.name}" style="height:40px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 2px;">
+                                <div>
+                                    <strong>${d.name.toUpperCase()}</strong>
+                                </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                                <button class="cyber-btn" style="font-size: 0.6em;" onclick="transferDigimon(${d.id}, 'roster')">HATCH TO ROSTER</button>
+                            </div>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function fetchInventory() {
+            const listDiv = document.getElementById('dterm-container');
+            listDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd;">[ SCANNING TERMINAL... ]</div>';
+            try {
+                const res = await fetch('/twa/api/inventory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData() })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    listDiv.innerHTML = `
+                        <div style="margin-bottom: 15px; color: #4fc3cd; text-align: center; border-bottom: 1px solid #4fc3cd; padding-bottom: 5px;">
+                            CURRENT BALANCE: <strong style="color:#fff;">${data.bits} ₿</strong>
+                        </div>
+                    `;
+
+                    if (Object.keys(data.items).length === 0) {
+                        listDiv.innerHTML += '<div style="text-align:center; color:#4fc3cd; opacity:0.7;">INVENTORY EMPTY.</div>';
+                        return;
+                    }
+
+                    Object.keys(data.items).forEach(itemName => {
+                        const item = document.createElement('div');
+                        item.className = 'cyber-item';
+                        item.innerHTML = `
+                            <div style="flex: 1;">
+                                <strong>${itemName.toUpperCase()}</strong>
+                            </div>
+                            <strong style="color:#fff;">x${data.items[itemName]}</strong>
+                        `;
+                        listDiv.appendChild(item);
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function transferDigimon(digimonId, targetLocation) {
+            closeModals();
+            try {
+                const res = await fetch('/twa/api/transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData(), digimon_id: digimonId, target_location: targetLocation })
+                });
+
+                if (res.ok) {
+                    showToast('Transferred successfully', 'SYSTEM UPDATE');
+                    await fetchVitals();
+                } else {
+                    const data = await res.json();
+                    showToast(data.detail || 'Transfer failed', 'ERROR');
+                }
+            } catch (e) {
+                showToast('Network error while transferring', 'ERROR');
+            }
+        }
+
+        async function selectPartner(digimonId) {
+            closeModals();
+            try {
+                const res = await fetch('/twa/api/roster/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData(), digimon_id: digimonId })
+                });
+
+                if (res.ok) {
+                    showToast('Partner switched successfully', 'SYSTEM UPDATE');
+                    await fetchVitals();
+                } else {
+                    showToast('Failed to switch partner', 'ERROR');
+                }
+            } catch (e) {
+                showToast('Network error while switching partner', 'ERROR');
             }
         }
 
@@ -808,8 +1071,8 @@
 
                     if (data.prev) {
                         html += `
-                            <div class="evo-node" style="opacity: 0.6; padding: 5px; border-color: rgba(79, 195, 205, 0.4);">
-                                ${data.prev.image ? `<img src="${data.prev.image}" style="height:40px; mix-blend-mode: multiply; filter: brightness(1.5);">` : ''}
+                            <div class="evo-node" style="opacity: 0.8; padding: 5px; border-color: rgba(79, 195, 205, 0.4);">
+                                ${data.prev.image ? `<img src="${data.prev.image}" style="height:40px; background: rgba(255,255,255,0.7); border-radius: 8px; padding: 2px;">` : ''}
                                 <div style="font-size: 0.8em">${data.prev.name.toUpperCase()}</div>
                             </div>
                             <div style="margin: 5px 0; color: #4fc3cd; font-size: 0.8em; opacity: 0.6;">▼</div>
@@ -819,24 +1082,33 @@
                     // Current Digimon
                     html += `
                         <div style="text-align: center; font-size: 1.4rem; color: #fff; font-weight: bold; margin: 10px 0; text-shadow: 0 0 10px #4fc3cd;">
-                            ${data.current_image ? `<img src="${data.current_image}" style="height:80px; mix-blend-mode: multiply; filter: brightness(1.2) drop-shadow(0 0 10px rgba(79,195,205,0.5));">` : ''}
-                            <div style="margin-top: 5px;">${data.current.toUpperCase()}</div>
+                            ${data.current_image ? `<img src="${data.current_image}" style="height:80px; background: #fff; border-radius: 50%; padding: 10px; box-shadow: 0 0 20px #4fc3cd, inset 0 0 10px rgba(0,0,0,0.1); border: 2px solid #4fc3cd;">` : ''}
+                            <div style="margin-top: 10px;">${data.current.toUpperCase()}</div>
                         </div>
                     `;
 
-                    if (data.next && data.next.length > 0) {
-                        html += `<div style="margin: 10px 0; color: #4fc3cd;">▼ ▼ ▼</div>
-                                 <div style="display: flex; gap: 15px; justify-content: center; width: 100%;">`;
-                        data.next.forEach(n => {
-                            html += `
-                                <div class="evo-node" style="flex: 1; max-width: 140px;">
-                                    ${n.image ? `<img src="${n.image}" style="height:50px; mix-blend-mode: multiply; filter: brightness(1.2);">` : ''}
-                                    <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
-                                    <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Unknown Req.'}</div>
+                    function renderTree(nodes, isRoot = false) {
+                        if (!nodes || nodes.length === 0) return '';
+                        let branchHtml = `<div style="display: flex; gap: 15px; justify-content: center; width: 100%; margin-top: ${isRoot ? '0' : '15px'};">`;
+                        nodes.forEach(n => {
+                            branchHtml += `
+                                <div style="display: flex; flex-direction: column; align-items: center; max-width: 140px;">
+                                    <div class="evo-node" style="width: 100%; box-sizing: border-box;">
+                                        ${n.image ? `<img src="${n.image}" style="height:50px; background: rgba(255,255,255,0.8); border-radius: 10px; padding: 4px; border: 1px solid rgba(79,195,205,0.5);">` : ''}
+                                        <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
+                                        <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Hidden Req.'}</div>
+                                    </div>
+                                    ${n.next && n.next.length > 0 ? `<div style="margin: 10px 0; color: #4fc3cd; font-size: 0.8em; opacity: 0.6;">▼</div>` + renderTree(n.next) : ''}
                                 </div>
                             `;
                         });
-                        html += `</div>`;
+                        branchHtml += `</div>`;
+                        return branchHtml;
+                    }
+
+                    if (data.next && data.next.length > 0) {
+                        html += `<div style="margin: 10px 0; color: #4fc3cd;">▼ ▼ ▼</div>`;
+                        html += renderTree(data.next, true);
                     } else if (data.current !== "Digitama") {
                         html += `
                             <div style="margin: 15px 0; color: #4fc3cd;">▼</div>
@@ -1030,6 +1302,59 @@
             }
         }
 
+        async function triggerAction(category, item) {
+            closeModals();
+            if (category === 'shop') {
+                if (item === 'meat') {
+                    await requestAction('feed');
+                } else if (item === 'egg') {
+                    await requestAction('buy_egg');
+                } else {
+                    if (tg && tg.showAlert) tg.showAlert(`Item ${item} is not yet fully implemented!`);
+                    else alert(`Item ${item} is not yet fully implemented!`);
+                }
+            } else {
+                if (tg && tg.showAlert) tg.showAlert(`Action ${category}:${item} is not yet fully implemented!`);
+                else alert(`Action ${category}:${item} is not yet fully implemented!`);
+            }
+        }
+
+        async function requestAction(actionName) {
+            const btnText = document.getElementById('lcd-menu-text');
+            const originalText = btnText.innerText;
+            btnText.innerText = 'WAIT...';
+
+            try {
+                const res = await fetch('/twa/api/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        initData: getInitData(),
+                        action: actionName.toLowerCase()
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.message) {
+                        showToast(data.message, "SUCCESS");
+                    } else if (data.result && data.result.hunger_recovered) {
+                        showToast(`Hunger +${data.result.hunger_recovered}`, "FED DIGIMON");
+                    }
+                    await fetchVitals();
+                } else {
+                    const errData = await res.json();
+                    showToast(`Error: ${errData.detail || 'Action failed'}`, "ACTION FAILED");
+                }
+            } catch (e) {
+                showToast('Network error during action.', 'NETWORK ERROR');
+            } finally {
+                btnText.innerText = originalText;
+                lcdState = 'IDLE';
+                updateLcdUI();
+            }
+        }
+
         function lcdSelect() {
             bounceSprite();
             if (lcdState === 'MENU') {
@@ -1037,11 +1362,9 @@
                 if (action === 'HATCH') {
                     requestHatch();
                 } else if (action === 'FEED') {
-                    if (tg && tg.showAlert) tg.showAlert('Digimon was fed meat!');
-                    else alert('Digimon was fed meat!');
+                    requestAction('feed');
                 } else if (action === 'PLAY') {
-                    if (tg && tg.showAlert) tg.showAlert('Played with Digimon! Bond increased.');
-                    else alert('Played with Digimon! Bond increased.');
+                    requestAction('play');
                 } else if (action === 'TRAIN') {
                     lcdState = 'POMO';
                     if (!pomoInterval) {

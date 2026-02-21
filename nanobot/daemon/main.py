@@ -12,6 +12,7 @@ from nanobot.game.database import init_db, SessionLocal
 from nanobot.game.sync import SyncManager
 from nanobot.daemon.twa import validate_telegram_init_data
 from nanobot.game import state
+from nanobot.game.assets import AssetManager
 
 async def background_sync_loop():
     manager = SyncManager()
@@ -191,45 +192,53 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
         if not info:
             return {"current": active.name, "prev": None, "next": []}
             
-        prior = info.get("priorEvolutions", [])
-        next_evos = info.get("nextEvolutions", [])
+        prior = info.get("evolvesFrom", [])
+        next_evos = info.get("evolvesTo", [])
         
         prev_data = None
         if prior:
+            prev_name = prior[0].get("name")
             prev_data = {
-                "name": prior[0].get("digimon"),
-                "image": prior[0].get("image")
+                "name": prev_name,
+                "image": f"/twa/api/sprite/{prev_name}" if prev_name else None
             }
         
-        # take up to 2 next evolutions
-        next_list = []
-        for n in next_evos:
-            valid_image = n.get("image")
-            if not valid_image:
-                continue
-                
-            target_name = n.get("digimon")
+        async def fetch_tree(d_name: str, current_depth: int, max_depth: int = 3):
+            d_info = await Digipedia.get_digimon_info(d_name)
+            if not d_info or current_depth > max_depth:
+                return []
             
-            # Check for AI-generated rule in DB
-            rule = db.query(EvolutionRule).filter_by(base_digimon=active.name, target_digimon=target_name).first()
-            if rule:
-                cond = rule.condition_string
-            else:
-                # Trigger LLM Generation Background Task
-                background_tasks.add_task(generate_evolution_conditions, active.name, target_name)
-                cond = "Analyzing Data..."
+            evos = []
+            for n in d_info.get("evolvesTo", []):
+                t_name = n.get("name")
+                if not t_name or not n.get("canon"):
+                    continue
+                
+                cond = "Hidden Req."
+                if current_depth == 1:
+                    rule = db.query(EvolutionRule).filter_by(base_digimon=d_name, target_digimon=t_name).first()
+                    if rule:
+                        cond = rule.condition_string
+                    else:
+                        background_tasks.add_task(generate_evolution_conditions, d_name, t_name)
+                        cond = "Analyzing Data..."
+                
+                evos.append({
+                    "name": t_name,
+                    "condition": cond,
+                    "image": f"/twa/api/sprite/{t_name}",
+                    "next": await fetch_tree(t_name, current_depth + 1, max_depth)
+                })
+                # Cap the number of branches per node to keep it readable (3 for direct children, 1 for grandchildren)
+                if len(evos) >= (3 if current_depth == 1 else 1):
+                    break
+            return evos
 
-            next_list.append({
-                "name": target_name,
-                "condition": cond,
-                "image": valid_image
-            })
-            if len(next_list) >= 2:
-                break
+        next_list = await fetch_tree(active.name, 1, 3)
             
         return {
             "current": active.name,
-            "current_image": info.get("images", [{}])[0].get("href") if info.get("images") else None,
+            "current_image": f"/twa/api/sprite/{active.name}",
             "prev": prev_data,
             "next": next_list
         }
@@ -325,40 +334,245 @@ async def twa_hatch_egg(request: Request):
 @app.get("/twa/api/sprite/{name}")
 async def proxy_digimon_sprite(name: str):
     """
-    Proxies the image from digi-api and strips out the white background
-    pixel-by-pixel using Pillow.
+    Returns the Digimon sprite from the local cache via AssetManager,
+    falling back to a transparent pixel if not found.
     """
-    url = f"https://digi-api.com/images/digimon/w/{name}.png"
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
-            resp.raise_for_status()
+    sprite_path = await AssetManager.get_sprite_path(name)
+    if sprite_path and os.path.exists(sprite_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(sprite_path, media_type="image/png")
+        
+    print(f"Sprite not found for {name}")
+    empty_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    return StreamingResponse(BytesIO(empty_png), media_type="image/png")
 
-            img = Image.open(BytesIO(resp.content)).convert("RGBA")
-            data = img.getdata()
-            new_data = []
+@app.post("/twa/api/action")
+async def twa_digimon_action(request: Request):
+    """
+    Handles simple actions like Feed, Play, Clean from the Minigame.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    action = body.get("action")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+    
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        active = state.get_active_digimon(db)
+        if not active:
+            raise HTTPException(status_code=400, detail="No active Digimon")
             
-            # Strip white/light-grey backgrounds natively
-            for item in data:
-                if item[0] > 240 and item[1] > 240 and item[2] > 240:
-                    new_data.append((255, 255, 255, 0)) # Alpha 0 (Transparent)
-                else:
-                    new_data.append(item)
-                    
-            img.putdata(new_data)
-            
-            output = BytesIO()
-            img.save(output, format="PNG")
-            output.seek(0)
-            
-            return StreamingResponse(output, media_type="image/png")
-            
-        except Exception as e:
-            print(f"Error fetching sprite {name}: {e}")
-            # Return empty 1x1 transparent PNG on error
-            empty_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
-            return StreamingResponse(BytesIO(empty_png), media_type="image/png")
+        if action == "feed":
+            res = state.feed_digimon(db, active.id, "Meat")
+            db.commit()
+            return {"status": "success", "message": None, "result": res}
+        elif action == "buy_egg":
+            from nanobot.game.models import DigimonState
+            new_egg = DigimonState(
+                species="Digitama",
+                name="Digitama",
+                stage="Digitama",
+                attribute="Unknown",
+                element="Unknown",
+                level=0,
+                location="incubator",
+                is_active=False
+            )
+            db.add(new_egg)
+            db.commit()
+            return {"status": "success", "message": "You bought a new Egg! It is available in your roster.", "result": {}}
+        elif action == "play":
+            # Very basic play implementation until we have complex minigames
+            active.energy = max(0, active.energy - 10)
+            active.hunger = max(0, active.hunger - 10)
+            active.exp += 15
+            active.bond = min(100, active.bond + 5)
+            db.commit()
+            return {"status": "success", "message": "Played with partner!"}
+        elif action == "clean":
+            active.bond = min(100, active.bond + 2)
+            db.commit()
+            return {"status": "success", "message": "Cleaned up area."}
+        else:
+            raise HTTPException(status_code=400, detail="Unknown action")
+    finally:
+        db.close()
+
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "digimon_daemon"}
+
+
+@app.post("/twa/api/roster")
+async def twa_get_roster(request: Request):
+    """
+    Returns the list of Digimon currently in the player's active team ('roster' location).
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        # Only fetch Digimon explicitly assigned to the active team roster
+        all_digi = db.query(DigimonState).filter(DigimonState.location == "roster").order_by(DigimonState.id).all()
+        roster = [
+            {
+                "id": d.id,
+                "name": d.name,
+                "stage": d.stage,
+                "location": d.location,
+                "level": d.level,
+                "current_hp": d.current_hp,
+                "is_active": d.is_active,
+            }
+            for d in all_digi
+        ]
+        return {"roster": roster}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/roster/select")
+async def twa_select_partner(request: Request):
+    """
+    Switch the active Digimon to the one specified by digimon_id.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    digimon_id = body.get("digimon_id")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    if not digimon_id:
+        raise HTTPException(status_code=400, detail="digimon_id required")
+
+    db = SessionLocal()
+    try:
+        target = state.set_active_digimon(db, int(digimon_id))
+        if not target:
+            raise HTTPException(status_code=404, detail="Digimon not found")
+        return {"status": "success", "active": target.name}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/farm")
+async def twa_get_farm(request: Request):
+    """Returns Digimon stored in the DigiFarm."""
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        farm_digi = db.query(DigimonState).filter(DigimonState.location == "farm").order_by(DigimonState.id).all()
+        farm = [{"id": d.id, "name": d.name, "stage": d.stage, "level": d.level, "current_hp": d.current_hp} for d in farm_digi]
+        return {"farm": farm}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/incubator")
+async def twa_get_incubator(request: Request):
+    """Returns Eggs stored in the Incubator."""
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        egg_digi = db.query(DigimonState).filter(DigimonState.location == "incubator").order_by(DigimonState.id).all()
+        incubator = [{"id": d.id, "name": d.name, "stage": d.stage} for d in egg_digi]
+        return {"incubator": incubator}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/transfer")
+async def twa_transfer_digimon(request: Request):
+    body = await request.json()
+    init_data = body.get("initData")
+    digimon_id = body.get("digimon_id")
+    target_location = body.get("target_location") # 'roster', 'farm', 'incubator'
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    if not digimon_id or not target_location:
+         raise HTTPException(status_code=400, detail="digimon_id and target_location required")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import DigimonState
+        target = db.query(DigimonState).filter(DigimonState.id == int(digimon_id)).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Digimon not found")
+        
+        # Enforce specific limits or business logic here if needed
+        # e.g., only transferring Digitama to Incubator
+        if target.stage != "Digitama" and target_location == "incubator":
+            raise HTTPException(status_code=400, detail="Only eggs can be stored in the Incubator")
+            
+        target.location = target_location
+        if target_location != "roster":
+            target.is_active = False # Deactivate if moved to storage
+            
+        db.commit()
+        return {"status": "success", "message": f"Moved to {target_location}!"}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/inventory")
+async def twa_get_inventory(request: Request):
+    """Returns the player's items, bits, crests, and digimentals."""
+    body = await request.json()
+    init_data = body.get("initData")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.models import Inventory
+        inv = db.query(Inventory).first()
+        if not inv:
+            return {"bits": 0, "items": {}, "crests": [], "digimentals": []}
+            
+        return {
+            "bits": inv.bits,
+            "items": inv.items,
+            "crests": inv.crests,
+            "digimentals": inv.digimentals
+        }
+    finally:
+        db.close()
+
