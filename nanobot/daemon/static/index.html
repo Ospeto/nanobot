@@ -1083,6 +1083,36 @@
             }
         }
 
+        async function evolveInto(targetName) {
+            try {
+                const res = await fetch('/twa/api/evolve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: getInitData(), target_name: targetName })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    if (tg && tg.showAlert) {
+                        tg.showAlert(`Evolution Successful! Your partner is now ${targetName}!`);
+                    } else {
+                        alert(`Evolution Successful! Your partner is now ${targetName}!`);
+                    }
+                    closeModals();
+                    fetchVitals();
+                } else {
+                    if (tg && tg.showAlert) {
+                        tg.showAlert('Evolution Failed: ' + data.error);
+                    } else {
+                        alert('Evolution Failed: ' + data.error);
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                if (tg && tg.showAlert) tg.showAlert("Network error processing evolution.");
+            }
+        }
+
         async function fetchEvoTree() {
             const treeDiv = document.getElementById('evo-tree-container');
             treeDiv.innerHTML = '<div style="text-align:center; color:#4fc3cd; margin-top:20px;">[ COMPILING DATA... ]</div>';
@@ -1122,10 +1152,11 @@
                         nodes.forEach(n => {
                             branchHtml += `
                                 <div style="display: flex; flex-direction: column; align-items: center; max-width: 140px;">
-                                    <div class="evo-node" style="width: 100%; box-sizing: border-box;">
+                                    <div class="evo-node" style="width: 100%; box-sizing: border-box; ${n.can_evolve ? 'border-color: #4fc3cd; background: rgba(79, 195, 205, 0.1);' : ''}">
                                         ${n.image ? `<img src="${n.image}" style="height:50px; background: rgba(255,255,255,0.8); border-radius: 10px; padding: 4px; border: 1px solid rgba(79,195,205,0.5);">` : ''}
                                         <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
                                         <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Hidden Req.'}</div>
+                                        ${n.can_evolve ? `<button onclick="evolveInto('${n.name}')" style="margin-top: 8px; padding: 5px 10px; background: #4fc3cd; color: #031518; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; animation: pulse 2s infinite;">EVOLVE</button>` : ''}
                                     </div>
                                     ${n.next && n.next.length > 0 ? `<div style="margin: 10px 0; color: #4fc3cd; font-size: 0.8em; opacity: 0.6;">▼</div>` + renderTree(n.next) : ''}
                                 </div>
@@ -1436,8 +1467,20 @@
                             } else {
                                 clearInterval(pomoInterval);
                                 pomoInterval = null;
-                                if (tg && tg.showAlert) tg.showAlert('Pomodoro Training complete! +EXP');
-                                else alert('Pomodoro Training complete! +EXP');
+
+                                fetch('/twa/api/claim_reward', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ initData: getInitData(), source: 'pomodoro', difficulty: 'hard' })
+                                }).then(res => res.json()).then(data => {
+                                    if (data.success) {
+                                        showToast(data.message, "TRAINING COMPLETE");
+                                        fetchVitals();
+                                    }
+                                }).catch(e => {
+                                    showToast("Pomodoro Training complete! +EXP", "TRAINING");
+                                });
+
                                 lcdState = 'IDLE';
                                 updateLcdUI();
                             }

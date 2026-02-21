@@ -191,7 +191,7 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
     try:
         from nanobot.game.encyclopedia import Digipedia
         from nanobot.game.models import EvolutionRule
-        from nanobot.game.evolution import generate_evolution_conditions
+        from nanobot.game.evolution import verify_evolution_requirements
         
         active = state.get_active_digimon(db)
         if not active or active.name == "Digitama":
@@ -224,17 +224,20 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
                     continue
                 
                 cond = "Hidden Req."
+                can_evolve = False
                 if current_depth == 1:
-                    rule = db.query(EvolutionRule).filter_by(base_digimon=d_name, target_digimon=t_name).first()
-                    if rule:
-                        cond = rule.condition_string
-                    else:
-                        background_tasks.add_task(generate_evolution_conditions, d_name, t_name)
-                        cond = "Analyzing Data..."
+                    t_info = await Digipedia.get_digimon_info(t_name)
+                    target_level_list = t_info.get("levels", []) if t_info else []
+                    target_stage = target_level_list[0] if target_level_list else (t_info.get("level", "") if t_info else "")
+                    
+                    val = await verify_evolution_requirements(db, active, t_name, target_stage)
+                    can_evolve = val.get("can_evolve", False)
+                    cond = val.get("reason", "Requirements Not Met")
                 
                 evos.append({
                     "name": t_name,
                     "condition": cond,
+                    "can_evolve": can_evolve,
                     "image": f"/twa/api/sprite/{t_name}",
                     "next": await fetch_tree(t_name, current_depth + 1, max_depth)
                 })
@@ -254,6 +257,70 @@ async def twa_get_evolution_tree(request: Request, background_tasks: BackgroundT
     except Exception as e:
         print(f"Error fetching evo tree: {e}")
         return {"current": "Unknown", "prev": None, "next": []}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/evolve")
+async def twa_evolve(request: Request):
+    """
+    Executes a deliberate user-initiated evolution via the TWA menu.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    target_name = body.get("target_name")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+    
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    if not target_name:
+        raise HTTPException(status_code=400, detail="Missing target_name")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.evolution import execute_evolution
+        active = state.get_active_digimon(db)
+        if not active or active.name == "Digitama":
+            return {"success": False, "error": "No valid active Digimon"}
+
+        res = await execute_evolution(db, active, target_name)
+        return res
+    except Exception as e:
+        print(f"Evolve endpoint error: {e}")
+        return {"success": False, "error": "Internal Server Error during Evolution"}
+    finally:
+        db.close()
+
+
+@app.post("/twa/api/claim_reward")
+async def twa_claim_reward(request: Request):
+    """
+    Executes a loot drop roll based on task difficulty.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    source = body.get("source", "unknown")
+    difficulty = body.get("difficulty", "medium")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+    
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        from nanobot.game.quests import roll_for_loot
+        active = state.get_active_digimon(db)
+        if not active or active.name == "Digitama":
+            return {"success": False, "error": "No valid active Digimon to receive rewards"}
+
+        res = roll_for_loot(db, active, difficulty)
+        return res
+    except Exception as e:
+        print(f"Claim endpoint error: {e}")
+        return {"success": False, "error": "Internal Server Error during Loot Roll"}
     finally:
         db.close()
 

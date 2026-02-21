@@ -65,83 +65,118 @@ Example: "High Bond & 0 Care Mistakes"
     finally:
         db.close()
 
-async def check_evolution_ready(db: Session) -> dict:
-    digi = state.get_active_digimon(db)
-    if not digi:
-        return {"error": "No active digimon"}
-        
-    info = await Digipedia.get_digimon_info(digi.name)
-    if not info:
-        return {"error": "Could not fetch evolution data"}
-        
-    next_evos = info.get("evolvesTo", [])
-    possible = []
-    
+async def verify_evolution_requirements(db: Session, active, target_name: str, target_stage: str) -> dict:
+    """
+    Returns {"can_evolve": bool, "reason": str} defining if the given active Digimon can evolve into target.
+    """
     inv = state.get_or_create_inventory(db)
-    crests = inv.crests if inv.crests else []
-    digimentals = inv.digimentals if inv.digimentals else []
+    target_stage_clean = str(target_stage or "").lower()
     
-    for evo in next_evos:
-        target_name = evo.get("name")
-        if not target_name:
-            continue
+    api_to_internal = {
+        "child": "rookie",
+        "adult": "champion",
+        "perfect": "ultimate",
+        "ultimate": "mega"
+    }
+    target_stage_clean = api_to_internal.get(target_stage_clean, target_stage_clean)
+
+    # Hidden / Special Evolution Check (X-Antibody)
+    if target_name.endswith(" X") or "X-Antibody" in target_name:
+        if "X-Antibody" in inv.items and inv.items["X-Antibody"] > 0:
+            return {"can_evolve": True, "reason": "X-Antibody Resonance Detected"}
+        else:
+            return {"can_evolve": False, "reason": "Requires X-Antibody Item"}
             
-        # Strongly prefer canon evolutions according to the Digimon DB dataset
-        if not evo.get("canon"):
-            continue
-            
-        # Optional check: If we have specific item requirements later, we can read them from 'condition'
-        # but the local DB mostly relies on raw possible targets. We keep crests logic loosely coupled.
+    # Crest Logic for specific branches (e.g., Flamedramon requires Digimental of Courage)
+    # We will expand this as needed, but for now allow specific text targets:
+    if "Crest" in target_name or "Magnamon" in target_name or "Flamedramon" in target_name:
+        if any("Courage" in c for c in inv.digimentals + inv.crests):
+            return {"can_evolve": True, "reason": "Crest/Digimental Resonance Detected"}
+        else:
+            return {"can_evolve": False, "reason": "Requires Special Item"}
+
+    # Standard Math Firewall Checks
+    if target_stage_clean == "baby ii":
+        if active.level >= 3:
+            return {"can_evolve": True, "reason": "Level Requirement Met"}
+        return {"can_evolve": False, "reason": "Requires Level 3+"}
         
-        # Stage filtering: Ensure logical progression
-        # e.g., Baby I -> Baby II, Baby II -> Rookie, etc.
-        target_info = await Digipedia.get_digimon_info(target_name)
-        if target_info:
-            # Data structure: levels is list of str, level is str
-            target_level_list = target_info.get("levels", [])
-            target_level_str = target_level_list[0] if target_level_list else target_info.get("level", "")
-            
-            current_stage = str(digi.stage or "").lower()
-            target_stage = str(target_level_str or "").lower()
-            
-            # Mapping API terms to Internal terms
-            api_to_internal = {
-                "child": "rookie",
-                "adult": "champion",
-                "perfect": "ultimate",
-                "ultimate": "mega"
-            }
-            target_stage = api_to_internal.get(target_stage, target_stage)
+    elif target_stage_clean == "rookie":
+        if active.level >= 10 and active.bond >= 20:
+            return {"can_evolve": True, "reason": "Level & Bond Met"}
+        return {"can_evolve": False, "reason": "Req Level 10+, Bond 20+"}
+        
+    elif target_stage_clean == "champion":
+        if active.level >= 20 and active.bond >= 50:
+            return {"can_evolve": True, "reason": "Level & Bond Met"}
+        return {"can_evolve": False, "reason": "Req Level 20+, Bond 50+"}
+        
+    elif target_stage_clean == "ultimate":
+        if active.level >= 40 and active.bond >= 80:
+            return {"can_evolve": True, "reason": "Level & Bond Met"}
+        return {"can_evolve": False, "reason": "Req Level 40+, Bond 80+"}
+        
+    elif target_stage_clean == "mega" or target_stage_clean == "ultra":
+        if active.level >= 60 and active.bond >= 100:
+            return {"can_evolve": True, "reason": "Max Bond Reached"}
+        return {"can_evolve": False, "reason": "Req Level 60+, Bond 100"}
 
-            # Simple linear progression check
-            stage_order = ["baby i", "baby ii", "rookie", "champion", "ultimate", "mega", "ultra"]
-            try:
-                curr_idx = stage_order.index(current_stage)
-                target_idx = stage_order.index(target_stage)
-                if target_idx != curr_idx + 1:
-                    continue # Skip skips or side-grades for now
-            except ValueError:
-                # If stage not in our list, fallback to inclusion
-                pass
+    # Fallback to true for unknown targets that slip through purely based on high levels
+    if active.level > 25:
+        return {"can_evolve": True, "reason": "High Level Override"}
+        
+    return {"can_evolve": False, "reason": "Requirements Not Met"}
 
-        # Mock bond check to prevent immediate evolution parsing explosion
-        if digi.bond >= 50 or digi.level >= 10:
-            possible.append(target_name)
-            
-    return {"possible_evolutions": possible}
 
-def trigger_agentic_quest(target_digimon: str):
+async def execute_evolution(db: Session, active, target_name: str) -> dict:
     """
-    Returns a system string describing the tool-use challenge the Digimon must complete to evolve.
+    Executes the deterministic state mutation, evolving the active digimon.
     """
-    quest = f"To evolve into {target_digimon}, you must prove your mastery over the digital world. Use your bash capability to write a python script that calculates the first 100 fibonacci numbers, saves it to a file, and executes it. Only when you successfully read the output back to me will I allow the evolution."
-    return quest
+    target_info = await Digipedia.get_digimon_info(target_name)
+    if not target_info:
+        return {"success": False, "error": "Target Digimon data missing from compendium."}
 
-def handle_jogress(db: Session, digimon_a_id: int, digimon_b_id: int, target_name: str):
-    """
-    DNA Digivolution. Merges two digimon node contexts.
-    """
-    return {"status": "Jogress complete", "new_digimon": target_name}
+    target_level_list = target_info.get("levels", [])
+    target_stage = target_level_list[0] if target_level_list else target_info.get("level", "")
+    
+    validation = await verify_evolution_requirements(db, active, target_name, target_stage)
+    if not validation["can_evolve"]:
+        return {"success": False, "error": validation["reason"]}
+        
+    inv = state.get_or_create_inventory(db)
+    
+    # Consume Special Items if it was an item evolution
+    if target_name.endswith(" X") or "X-Antibody" in target_name:
+        if "X-Antibody" in inv.items and inv.items["X-Antibody"] > 0:
+            inv.items["X-Antibody"] -= 1
+
+    # Mutate State
+    active.species = target_name
+    active.name = target_name
+    active.stage = target_stage
+    
+    # Reset level mechanically but bump max bounds
+    active.level = 1
+    active.bond = int(active.bond / 2) # Halve bond to simulate evolving shock
+    active.exp = 0
+    active.max_hp = active.max_hp + 100
+    active.current_hp = active.max_hp
+    active.energy = 100
+    active.hunger = 100
+    
+    # Set element logic safely
+    elements = target_info.get("skills", [])
+    if elements:
+        active.element = elements[0].get("attribute", active.element)
+        
+    attributes = target_info.get("attributes", [])
+    if attributes:
+        active.attribute = attributes[0].get("attribute", active.attribute)
+        
+    db.commit()
+    db.refresh(active)
+    
+    return {"success": True, "message": f"Evolved into {target_name}!", "new_stage": target_stage}
 
 def hatch_digitama(weather: str, hour: int) -> dict:
     """
