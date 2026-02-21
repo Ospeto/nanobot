@@ -1030,6 +1030,52 @@
             }
         }
 
+        async function triggerAction(category, item) {
+            closeModals();
+            if (category === 'shop' && item === 'meat') {
+                await requestAction('feed');
+            } else {
+                if (tg && tg.showAlert) tg.showAlert(`Action ${category}:${item} is not yet fully implemented!`);
+                else alert(`Action ${category}:${item} is not yet fully implemented!`);
+            }
+        }
+
+        async function requestAction(actionName) {
+            const btnText = document.getElementById('lcd-menu-text');
+            const originalText = btnText.innerText;
+            btnText.innerText = 'WAIT...';
+
+            try {
+                const res = await fetch('/twa/api/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        initData: getInitData(),
+                        action: actionName.toLowerCase()
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.message) {
+                        showToast(data.message, "SUCCESS");
+                    } else if (data.result && data.result.hunger_recovered) {
+                        showToast(`Hunger +${data.result.hunger_recovered}`, "FED DIGIMON");
+                    }
+                    await fetchVitals();
+                } else {
+                    const errData = await res.json();
+                    showToast(`Error: ${errData.detail || 'Action failed'}`, "ACTION FAILED");
+                }
+            } catch (e) {
+                showToast('Network error during action.', 'NETWORK ERROR');
+            } finally {
+                btnText.innerText = originalText;
+                lcdState = 'IDLE';
+                updateLcdUI();
+            }
+        }
+
         function lcdSelect() {
             bounceSprite();
             if (lcdState === 'MENU') {
@@ -1037,11 +1083,9 @@
                 if (action === 'HATCH') {
                     requestHatch();
                 } else if (action === 'FEED') {
-                    if (tg && tg.showAlert) tg.showAlert('Digimon was fed meat!');
-                    else alert('Digimon was fed meat!');
+                    requestAction('feed');
                 } else if (action === 'PLAY') {
-                    if (tg && tg.showAlert) tg.showAlert('Played with Digimon! Bond increased.');
-                    else alert('Played with Digimon! Bond increased.');
+                    requestAction('play');
                 } else if (action === 'TRAIN') {
                     lcdState = 'POMO';
                     if (!pomoInterval) {

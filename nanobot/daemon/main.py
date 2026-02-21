@@ -12,6 +12,7 @@ from nanobot.game.database import init_db, SessionLocal
 from nanobot.game.sync import SyncManager
 from nanobot.daemon.twa import validate_telegram_init_data
 from nanobot.game import state
+from nanobot.game.assets import AssetManager
 
 async def background_sync_loop():
     manager = SyncManager()
@@ -325,39 +326,59 @@ async def twa_hatch_egg(request: Request):
 @app.get("/twa/api/sprite/{name}")
 async def proxy_digimon_sprite(name: str):
     """
-    Proxies the image from digi-api and strips out the white background
-    pixel-by-pixel using Pillow.
+    Returns the Digimon sprite from the local cache via AssetManager,
+    falling back to a transparent pixel if not found.
     """
-    url = f"https://digi-api.com/images/digimon/w/{name}.png"
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10.0)
-            resp.raise_for_status()
+    sprite_path = await AssetManager.get_sprite_path(name)
+    if sprite_path and os.path.exists(sprite_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(sprite_path, media_type="image/png")
+        
+    print(f"Sprite not found for {name}")
+    empty_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    return StreamingResponse(BytesIO(empty_png), media_type="image/png")
 
-            img = Image.open(BytesIO(resp.content)).convert("RGBA")
-            data = img.getdata()
-            new_data = []
+@app.post("/twa/api/action")
+async def twa_digimon_action(request: Request):
+    """
+    Handles simple actions like Feed, Play, Clean from the Minigame.
+    """
+    body = await request.json()
+    init_data = body.get("initData")
+    action = body.get("action")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "dummy")
+    
+    is_dev = os.getenv("ENV", "dev") == "dev" or init_data == "dummy"
+    if not is_dev and not validate_telegram_init_data(init_data, bot_token):
+        raise HTTPException(status_code=401, detail="Invalid Telegram signature")
+
+    db = SessionLocal()
+    try:
+        active = state.get_active_digimon(db)
+        if not active:
+            raise HTTPException(status_code=400, detail="No active Digimon")
             
-            # Strip white/light-grey backgrounds natively
-            for item in data:
-                if item[0] > 240 and item[1] > 240 and item[2] > 240:
-                    new_data.append((255, 255, 255, 0)) # Alpha 0 (Transparent)
-                else:
-                    new_data.append(item)
-                    
-            img.putdata(new_data)
-            
-            output = BytesIO()
-            img.save(output, format="PNG")
-            output.seek(0)
-            
-            return StreamingResponse(output, media_type="image/png")
-            
-        except Exception as e:
-            print(f"Error fetching sprite {name}: {e}")
-            # Return empty 1x1 transparent PNG on error
-            empty_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
-            return StreamingResponse(BytesIO(empty_png), media_type="image/png")
+        if action == "feed":
+            res = state.feed_digimon(db, active.id, "Meat")
+            db.commit()
+            return {"status": "success", "result": res}
+        elif action == "play":
+            # Very basic play implementation until we have complex minigames
+            active.energy = max(0, active.energy - 10)
+            active.hunger = max(0, active.hunger - 10)
+            active.exp += 15
+            active.bond = min(100, active.bond + 5)
+            db.commit()
+            return {"status": "success", "message": "Played with partner!"}
+        elif action == "clean":
+            active.bond = min(100, active.bond + 2)
+            db.commit()
+            return {"status": "success", "message": "Cleaned up area."}
+        else:
+            raise HTTPException(status_code=400, detail="Unknown action")
+    finally:
+        db.close()
+
 
 @app.get("/health")
 def health_check():

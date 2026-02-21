@@ -286,10 +286,26 @@ class TelegramChannel(BaseChannel):
             return
 
         user = update.effective_user
+        
+        import os
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+        
+        reply_markup = None
+        twa_url = os.getenv("TWA_URL")
+        if twa_url:
+            keyboard = [[
+                InlineKeyboardButton(
+                    "📱 Open Digivice",
+                    web_app=WebAppInfo(url=twa_url)
+                )
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
         await update.message.reply_text(
             f"👋 Hi {user.first_name}! I'm nanobot.\n\n"
             "Send me a message and I'll respond!\n"
-            "Type /help to see available commands."
+            "Type /help to see available commands.",
+            reply_markup=reply_markup
         )
 
     async def _on_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
