@@ -344,6 +344,14 @@ def gateway(
     console.print(f"{__logo__} Starting nanobot gateway on port {port}...")
     
     config = load_config()
+    
+    # Initialize game database
+    try:
+        from nanobot.game.database import init_db
+        init_db()
+    except ImportError:
+        pass
+        
     bus = MessageBus()
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)

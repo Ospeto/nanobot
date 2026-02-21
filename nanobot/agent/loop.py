@@ -487,7 +487,6 @@ class AgentLoop:
         logger.info("Agent loop started")
         
         # Start proactive background tasks
-        asyncio.create_task(self._proactive_message_loop())
         asyncio.create_task(self._proactive_mas_alerts_loop())
         asyncio.create_task(self._proactive_calendar_alerts_loop())
         asyncio.create_task(self._proactive_daily_scheduler_loop())
