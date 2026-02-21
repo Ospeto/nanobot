@@ -138,7 +138,7 @@ class AgentLoop:
 
         # Game tools (for Digimon companion)
         try:
-            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool, AddAssignmentTool, GenerateIDCardTool
+            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool, AddAssignmentTool
             from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
             from nanobot.agent.tools.init import InitDigimonTool
             from nanobot.agent.tools.calendar import BlockTimeTool, ListCalendarTool, ManageCalendarTool
@@ -149,7 +149,6 @@ class AgentLoop:
             self.tools.register(ListTasksTool())
             self.tools.register(CompleteTaskTool())
             self.tools.register(AddAssignmentTool())
-            self.tools.register(GenerateIDCardTool())
             self.tools.register(ManageMemoryGraphTool())
             self.tools.register(SearchMemoryGraphTool())
             self.tools.register(InitDigimonTool())
