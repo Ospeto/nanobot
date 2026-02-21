@@ -10,7 +10,7 @@ def get_model_for_stage(stage: str) -> str:
     elif stage in ["champion", "ultimate", "armor"]:
         return "gemini/gemini-2.5-flash"
     elif stage in ["mega", "ultra", "super ultimate"]:
-        return "gemini/gemini-2.5-pro"
+        return "gemini/gemini-3.1-pro"
         
     return base_model
 

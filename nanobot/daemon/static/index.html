@@ -444,6 +444,55 @@
             border-radius: 4px;
             font-weight: bold;
             font-family: inherit;
+            flex-shrink: 0;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .cyber-btn:hover {
+            box-shadow: 0 0 10px rgba(79, 195, 205, 0.8);
+            transform: scale(1.05);
+        }
+
+        .cyber-btn:active {
+            transform: scale(0.9);
+            box-shadow: 0 0 15px rgba(79, 195, 205, 1);
+        }
+
+        /* Custom Toast Notification */
+        .cyber-toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(3, 21, 24, 0.9);
+            border: 1px solid #4fc3cd;
+            box-shadow: 0 0 15px rgba(79, 195, 205, 0.4);
+            color: #4fc3cd;
+            padding: 12px 20px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            text-align: center;
+            min-width: 200px;
+            max-width: 80%;
+            backdrop-filter: blur(5px);
+        }
+
+        .cyber-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        .toast-title {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(79, 195, 205, 0.3);
+            padding-bottom: 3px;
         }
 
         .evo-tree {
@@ -595,6 +644,9 @@
         </div>
     </div>
 
+    <!-- Custom Toast Notification Container -->
+    <div id="cyber-toast" class="cyber-toast"></div>
+
     <script>
         const tg = window.Telegram ? window.Telegram.WebApp : null;
         if (tg) {
@@ -604,6 +656,18 @@
 
         // Use dummy data if Telegram is not available
         const getInitData = () => tg && tg.initData ? tg.initData : "dummy";
+
+        function showToast(message, title = "SYSTEM UPDATE") {
+            const toast = document.getElementById('cyber-toast');
+            toast.innerHTML = `<span class="toast-title">${title}</span>${message.replace(/\n/g, '<br>')}`;
+            toast.classList.add('show');
+
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
 
         // Setup background cubes
         const bg = document.getElementById('bg-world');
@@ -666,11 +730,11 @@
                         const item = document.createElement('div');
                         item.className = 'cyber-item';
                         item.innerHTML = `
-                            <div>
-                                <strong>[!] ${task.title.substring(0, 30)}${task.title.length > 30 ? '...' : ''}</strong>
+                            <div style="flex: 1; padding-right: 15px;">
+                                <strong>[!] ${task.title}</strong>
                                 <div style="font-size:0.8em; opacity:0.8; margin-top:5px;">Source: ${task.source}</div>
                             </div>
-                            <button class="cyber-btn" onclick="completeTask('${task.task_id}')">EXEC</button>
+                            <button class="cyber-btn" onclick="completeTask('${task.id}', this)">EXEC</button>
                         `;
                         listDiv.appendChild(item);
                     });
@@ -682,8 +746,15 @@
             }
         }
 
-        async function completeTask(taskId) {
+        async function completeTask(taskId, btn) {
             if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('rigid');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = 'WAIT...';
+                btn.style.opacity = '0.5';
+            }
+
             try {
                 const res = await fetch(`/twa/api/tasks/${taskId}/complete`, {
                     method: 'POST',
@@ -691,22 +762,32 @@
                     body: JSON.stringify({ initData: getInitData() })
                 });
 
+                let data;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    data = { detail: "Server error parsing response." };
+                }
+
                 if (res.ok) {
-                    const data = await res.json();
-                    if (tg && tg.showAlert) {
-                        tg.showAlert(`MISSION COMPLETE!\n\nGained: ${data.combat_results.exp_gain} EXP\nLoot: ${data.combat_results.bits_gain} Bits`);
-                    } else {
-                        alert(`MISSION COMPLETE!\nGained: ${data.combat_results.exp_gain} EXP\nLoot: ${data.combat_results.bits_gain} Bits`);
+                    // Update UI gracefully via await before blocking
+                    await fetchTasks();
+                    await fetchVitals();
+
+                    if (data.status !== "already_completed") {
+                        const msg = `Gained: ${data.combat_result?.exp || 0} EXP\nLoot: ${data.combat_result?.bits || 0} Bits`;
+                        showToast(msg, "MISSION COMPLETE");
                     }
-                    fetchTasks(); // Refresh list
-                    fetchVitals(); // Refresh Digimon stats
                 } else {
-                    if (tg && tg.showAlert) tg.showAlert("Failed to sync task completion.");
-                    else alert("Failed to sync task completion");
+                    const errMsg = data.detail || "Failed to sync task completion.";
+                    showToast(errMsg, "SYNC ERROR");
+
+                    if (btn) { btn.disabled = false; btn.innerText = 'EXEC'; btn.style.opacity = '1'; }
                 }
             } catch (e) {
-                if (tg && tg.showAlert) tg.showAlert("Network error during execution.");
-                else alert("Network error during execution");
+                showToast("Network error during execution", "NETWORK ERROR");
+
+                if (btn) { btn.disabled = false; btn.innerText = 'EXEC'; btn.style.opacity = '1'; }
             }
         }
 

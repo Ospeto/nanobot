@@ -4,7 +4,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-SCOPES = ['https://www.googleapis.com/auth/tasks.readonly', 'https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = ['https://www.googleapis.com/auth/tasks', 'https://www.googleapis.com/auth/calendar.readonly']
 
 class GoogleIntegration:
     def __init__(self):
@@ -86,6 +86,39 @@ class GoogleIntegration:
         except Exception as e:
             print(f"Error completing Google Task {task_id}: {e}")
             return False
+
+    def create_task(self, title: str, due_date: str | None = None, notes: str | None = None) -> dict | None:
+        """Create a new task in the first Google Tasks list.
+        
+        Args:
+            title: Task title
+            due_date: Optional due date in YYYY-MM-DD format
+            notes: Optional task notes/description
+        Returns:
+            The created task dict, or None on failure
+        """
+        if not self.authenticate():
+            return None
+            
+        try:
+            service = build('tasks', 'v1', credentials=self.creds, cache_discovery=False)
+            results = service.tasklists().list(maxResults=10).execute()
+            items = results.get('items', [])
+            if not items:
+                return None
+                
+            tasklist_id = items[0]['id']
+            body = {'title': title}
+            if due_date:
+                body['due'] = f'{due_date}T00:00:00.000Z'
+            if notes:
+                body['notes'] = notes
+                
+            task = service.tasks().insert(tasklist=tasklist_id, body=body).execute()
+            return task
+        except Exception as e:
+            print(f"Error creating Google Task: {e}")
+            return None
 
     def get_upcoming_events(self):
         if not self.authenticate():

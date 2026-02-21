@@ -30,6 +30,9 @@ Example: "High Bond & 0 Care Mistakes"
         response = await provider.chat([{"role": "user", "content": prompt}], max_tokens=50)
         
         condition_string = response.content.strip().strip('"\'')
+        if response.finish_reason == "error" or condition_string.startswith("Error calling LLM:"):
+            raise ValueError(f"LLM returned error: {condition_string}")
+
         if len(condition_string) > 40:
             condition_string = condition_string[:37] + "..."
             
@@ -79,6 +82,10 @@ async def check_evolution_ready(db: Session) -> dict:
     digimentals = inv.digimentals if inv.digimentals else []
     
     for evo in next_evos:
+        target_name = evo.get("digimon")
+        if not target_name:
+            continue
+            
         cond = evo.get("condition", "") or ""
         
         # Parse API condition string (basic logic)
@@ -87,9 +94,37 @@ async def check_evolution_ready(db: Session) -> dict:
         if "X-Antibody" in cond and "X-Antibody" not in digimentals:
             continue
             
+        # Stage filtering: Ensure logical progression
+        # e.g., Baby I -> Baby II, Baby II -> Rookie, etc.
+        target_info = await Digipedia.get_digimon_info(target_name)
+        if target_info:
+            target_level = target_info.get("levels", [{}])[0].get("level", "")
+            current_stage = digi.stage.lower()
+            target_stage = target_level.lower()
+            
+            # Mapping API terms to Internal terms
+            api_to_internal = {
+                "child": "rookie",
+                "adult": "champion",
+                "perfect": "ultimate",
+                "ultimate": "mega"
+            }
+            target_stage = api_to_internal.get(target_stage, target_stage)
+
+            # Simple linear progression check
+            stage_order = ["baby i", "baby ii", "rookie", "champion", "ultimate", "mega", "ultra"]
+            try:
+                curr_idx = stage_order.index(current_stage)
+                target_idx = stage_order.index(target_stage)
+                if target_idx != curr_idx + 1:
+                    continue # Skip skips or side-grades for now
+            except ValueError:
+                # If stage not in our list, fallback to inclusion
+                pass
+
         # Mock bond check to prevent immediate evolution parsing explosion
         if digi.bond >= 50 or digi.level >= 10:
-            possible.append(evo.get("digimon"))
+            possible.append(target_name)
             
     return {"possible_evolutions": possible}
 

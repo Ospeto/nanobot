@@ -131,7 +131,7 @@ class AgentLoop:
             self.tools.register(CronTool(self.cron_service))
         # Game tools (for Digimon companion)
         try:
-            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool
+            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool, AddAssignmentTool
             from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
             from nanobot.agent.tools.init import InitDigimonTool
             
@@ -140,6 +140,7 @@ class AgentLoop:
             self.tools.register(PlayTool())
             self.tools.register(ListTasksTool())
             self.tools.register(CompleteTaskTool())
+            self.tools.register(AddAssignmentTool())
             self.tools.register(ManageMemoryGraphTool())
             self.tools.register(SearchMemoryGraphTool())
             self.tools.register(InitDigimonTool())
@@ -487,14 +488,7 @@ class AgentLoop:
             try:
                 list_tasks_tool = self.tools.get("list_tasks")
                 if list_tasks_tool:
-                    # Determine source filter from user message
-                    if "google" in _msg_lower:
-                        _source = "google_tasks"
-                    elif "notion" in _msg_lower:
-                        _source = "notion"
-                    else:
-                        _source = "all"
-                    task_result = await list_tasks_tool.execute(source_filter=_source)
+                    task_result = await list_tasks_tool.execute()
                     # Inject pre-fetched data into system prompt
                     if initial_messages and initial_messages[0].get("role") == "system":
                         initial_messages[0]["content"] += (
@@ -504,7 +498,7 @@ class AgentLoop:
                             f"IMPORTANT: The task data above was retrieved by your Digivice. "
                             f"Present this data to the Tamer in your response. Do NOT say you cannot see tasks."
                         )
-                    logger.info("Pre-fetched tasks (source={}): {}", _source, task_result[:120])
+                    logger.info("Pre-fetched tasks for system prompt")
             except Exception as e:
                 logger.error("Task pre-fetch failed: {}", e)
         # --- END FORCED TASK PRE-FETCH ---

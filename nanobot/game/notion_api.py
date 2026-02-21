@@ -124,3 +124,47 @@ class NotionIntegration:
         except Exception as e:
             print(f"Error completing Notion Task {page_id}: {e}")
             return False
+
+    def create_assignment(self, title: str, due_date: str | None = None, task_type: str = "Assignment") -> dict | None:
+        """Create a new assignment/exam entry in the MAS Dashboard Notion database.
+        
+        Args:
+            title: Assignment/exam title
+            due_date: Optional due date in YYYY-MM-DD format
+            task_type: Type of task - 'Assignment', 'Exam', or 'Task'
+        Returns:
+            The created page dict, or None on failure
+        """
+        if not self.is_authenticated():
+            return None
+            
+        mas_db_id = "29a0cc17-6cb9-81e9-bc2e-d537a7cabb82"
+        url = "https://api.notion.com/v1/pages"
+        
+        properties = {
+            "Title": {
+                "title": [{"text": {"content": title}}]
+            },
+            "Status": {
+                "status": {"name": "Not Started"}
+            }
+        }
+        
+        if task_type:
+            properties["Type"] = {"select": {"name": task_type}}
+            
+        if due_date:
+            properties["Due Date"] = {"date": {"start": due_date}}
+        
+        payload = {
+            "parent": {"database_id": mas_db_id},
+            "properties": properties
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Error creating Notion assignment: {e}")
+            return None

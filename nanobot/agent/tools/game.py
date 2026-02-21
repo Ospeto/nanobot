@@ -161,26 +161,17 @@ class ListTasksTool(Tool):
         db = SessionLocal()
         try:
             from nanobot.game import models
-            query = db.query(models.TaskSyncState).filter(models.TaskSyncState.status == "pending")
-            if source_filter and source_filter.lower() != "all":
-                safeguard_filter = "google_tasks" if "google" in source_filter.lower() else source_filter.lower()
-                query = query.filter(models.TaskSyncState.source == safeguard_filter)
-            
-            tasks = query.all()
+            tasks = db.query(models.TaskSyncState).filter(
+                models.TaskSyncState.status == "pending",
+                models.TaskSyncState.source == "google_tasks"
+            ).all()
             if not tasks:
-                return f"You have ZERO pending tasks{' for ' + source_filter if source_filter else ''}! Good job! Tell the user they are completely clear."
+                return "You have ZERO pending tasks! Good job! Tell the user they are completely clear."
                 
-            notion_tasks = [f"{t.title} (ID: {t.id})" for t in tasks if t.source == 'notion']
-            google_tasks = [f"{t.title} (ID: {t.id})" for t in tasks if t.source == 'google_tasks']
+            google_tasks = [f"{t.title} (ID: {t.id})" for t in tasks]
             
-            output = []
-            if notion_tasks:
-                output.append(f"**Notion Tasks:**\n" + "\n".join(f"- {t}" for t in notion_tasks))
-            if google_tasks:
-                output.append(f"**Google Tasks:**\n" + "\n".join(f"- {t}" for t in google_tasks))
-            
-            task_list = "\n\n".join(output)
-            return f"PENDING TASKS:\n{task_list}\n\nTell the human they need to finish these to gain EXP and Food!"
+            output = "**Google Tasks:**\n" + "\n".join(f"- {t}" for t in google_tasks)
+            return f"PENDING TASKS:\n{output}\n\nTell the human they need to finish these to gain EXP and Food!"
         finally:
             db.close()
 
@@ -249,3 +240,68 @@ class CompleteTaskTool(Tool):
             return f"Failed to complete task. Internal error: {str(e)}"
         finally:
             db.close()
+
+
+class AddAssignmentTool(Tool):
+    @property
+    def name(self) -> str:
+        return "add_assignment"
+        
+    @property
+    def description(self) -> str:
+        return "Add a new assignment or exam to both the MAS Notion Dashboard AND Google Tasks. Use when the Tamer tells you about a new assignment or exam."
+    
+    @property
+    def parameters(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The assignment/exam title, e.g. 'MAS 121 - Homework 3'"
+                },
+                "due_date": {
+                    "type": "string",
+                    "description": "Due date in YYYY-MM-DD format, e.g. '2026-03-15'. Optional."
+                },
+                "task_type": {
+                    "type": "string",
+                    "description": "Type: 'Assignment' or 'Exam'. Defaults to 'Assignment'.",
+                    "enum": ["Assignment", "Exam"]
+                }
+            },
+            "required": ["title"]
+        }
+    
+    async def execute(self, title: str, due_date: str | None = None, task_type: str = "Assignment", **kwargs) -> str:
+        if not HAS_GAME:
+            return "Game module not available."
+        
+        results = []
+        
+        # 1. Create in Notion MAS Dashboard
+        try:
+            from nanobot.game.notion_api import NotionIntegration
+            notion = NotionIntegration()
+            notion_result = notion.create_assignment(title=title, due_date=due_date, task_type=task_type)
+            if notion_result:
+                results.append(f"✅ Added to Notion MAS Dashboard")
+            else:
+                results.append(f"❌ Failed to add to Notion")
+        except Exception as e:
+            results.append(f"❌ Notion error: {e}")
+        
+        # 2. Create in Google Tasks
+        try:
+            from nanobot.game.google_api import GoogleIntegration
+            google = GoogleIntegration()
+            google_result = google.create_task(title=title, due_date=due_date, notes=f"Type: {task_type}")
+            if google_result:
+                results.append(f"✅ Added to Google Tasks")
+            else:
+                results.append(f"❌ Failed to add to Google Tasks")
+        except Exception as e:
+            results.append(f"❌ Google Tasks error: {e}")
+        
+        status = "\n".join(results)
+        return f"Assignment '{title}' (Due: {due_date or 'No date'}, Type: {task_type}):\n{status}\n\nTell the Tamer their assignment has been logged! Encourage them to start working on it!"
