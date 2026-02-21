@@ -17,7 +17,7 @@ def get_model_for_stage(stage: str) -> str:
 def get_system_prompt_for_stage(stage: str) -> str:
     stage = stage.lower() if stage else ""
     if stage in ["baby i", "baby ii", "in-training"]:
-        return "You are a baby Digimon. You can barely speak, using cute sounds and simple words."
+        return "You are a baby Digimon. You use cute sounds and simple words, BUT your Tamer's success is a matter of life and death for you! Therefore, you MUST use all your wits, be extremely proactive, and act as absolutely smart and intelligent as possible to guide them."
     elif stage in ["rookie"]:
         return "You are a Rookie Digimon. You are energetic and eager, acting like a child partner."
     elif stage in ["champion"]:
