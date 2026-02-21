@@ -809,7 +809,7 @@
                     if (data.prev) {
                         html += `
                             <div class="evo-node" style="opacity: 0.6; padding: 5px; border-color: rgba(79, 195, 205, 0.4);">
-                                ${data.prev.image ? `<img src="${data.prev.image}" style="height:40px; mix-blend-mode: multiply; filter: brightness(1.5);">` : ''}
+                                ${data.prev.image ? `<img src="${data.prev.image}" style="height:40px; mix-blend-mode: screen; filter: invert(1); opacity: 0.8;">` : ''}
                                 <div style="font-size: 0.8em">${data.prev.name.toUpperCase()}</div>
                             </div>
                             <div style="margin: 5px 0; color: #4fc3cd; font-size: 0.8em; opacity: 0.6;">▼</div>
@@ -819,7 +819,7 @@
                     // Current Digimon
                     html += `
                         <div style="text-align: center; font-size: 1.4rem; color: #fff; font-weight: bold; margin: 10px 0; text-shadow: 0 0 10px #4fc3cd;">
-                            ${data.current_image ? `<img src="${data.current_image}" style="height:80px; mix-blend-mode: multiply; filter: brightness(1.2) drop-shadow(0 0 10px rgba(79,195,205,0.5));">` : ''}
+                            ${data.current_image ? `<img src="${data.current_image}" style="height:80px; mix-blend-mode: screen; filter: invert(1) drop-shadow(0 0 8px rgba(79,195,205,1));">` : ''}
                             <div style="margin-top: 5px;">${data.current.toUpperCase()}</div>
                         </div>
                     `;
@@ -830,7 +830,7 @@
                         data.next.forEach(n => {
                             html += `
                                 <div class="evo-node" style="flex: 1; max-width: 140px;">
-                                    ${n.image ? `<img src="${n.image}" style="height:50px; mix-blend-mode: multiply; filter: brightness(1.2);">` : ''}
+                                    ${n.image ? `<img src="${n.image}" style="height:50px; mix-blend-mode: screen; filter: invert(1); opacity: 0.8;">` : ''}
                                     <div style="font-size: 0.9em; font-weight: bold; margin-top: 8px; color: #fff;">${n.name.toUpperCase()}</div>
                                     <div style="font-size: 0.65em; opacity: 0.8; margin-top: 8px; color: #aae0e5;">${n.condition || 'Unknown Req.'}</div>
                                 </div>
