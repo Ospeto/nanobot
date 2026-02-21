@@ -52,7 +52,7 @@ class NotionIntegration:
             "properties": {
                 "Status": {
                     "status": {
-                        "name": "Done"
+                        "name": "Complete"
                     }
                 }
             }
@@ -60,8 +60,13 @@ class NotionIntegration:
         try:
             response = requests.patch(url, json=payload, headers=self.headers)
             if response.status_code != 200:
-                # Try fallback for 'select' type property instead of 'status'
-                payload["properties"]["Status"] = {"select": {"name": "Done"}}
+                # Try fallback for 'Done' or 'select' type property
+                payload["properties"]["Status"] = {"status": {"name": "Done"}}
+                response = requests.patch(url, json=payload, headers=self.headers)
+                
+            if response.status_code != 200:
+                # Try fallback for select instead of status
+                payload["properties"]["Status"] = {"select": {"name": "Complete"}}
                 response = requests.patch(url, json=payload, headers=self.headers)
             response.raise_for_status()
             return True
