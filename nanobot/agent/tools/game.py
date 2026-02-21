@@ -5,6 +5,7 @@ from nanobot.agent.tools.base import Tool
 try:
     from nanobot.game.database import SessionLocal
     from nanobot.game import state, shop
+    from nanobot.game.draw_id_card import render_id_card
     HAS_GAME = True
 except ImportError:
     HAS_GAME = False

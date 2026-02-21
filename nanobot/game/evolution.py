@@ -74,7 +74,7 @@ async def check_evolution_ready(db: Session) -> dict:
     if not info:
         return {"error": "Could not fetch evolution data"}
         
-    next_evos = info.get("nextEvolutions", [])
+    next_evos = info.get("evolvesTo", [])
     possible = []
     
     inv = state.get_or_create_inventory(db)
@@ -82,25 +82,27 @@ async def check_evolution_ready(db: Session) -> dict:
     digimentals = inv.digimentals if inv.digimentals else []
     
     for evo in next_evos:
-        target_name = evo.get("digimon")
+        target_name = evo.get("name")
         if not target_name:
             continue
             
-        cond = evo.get("condition", "") or ""
-        
-        # Parse API condition string (basic logic)
-        if "Courage" in cond and "Crest of Courage" not in crests:
-            continue
-        if "X-Antibody" in cond and "X-Antibody" not in digimentals:
+        # Strongly prefer canon evolutions according to the Digimon DB dataset
+        if not evo.get("canon"):
             continue
             
+        # Optional check: If we have specific item requirements later, we can read them from 'condition'
+        # but the local DB mostly relies on raw possible targets. We keep crests logic loosely coupled.
+        
         # Stage filtering: Ensure logical progression
         # e.g., Baby I -> Baby II, Baby II -> Rookie, etc.
         target_info = await Digipedia.get_digimon_info(target_name)
         if target_info:
-            target_level = target_info.get("levels", [{}])[0].get("level", "")
-            current_stage = digi.stage.lower()
-            target_stage = target_level.lower()
+            # Data structure: levels is list of str, level is str
+            target_level_list = target_info.get("levels", [])
+            target_level_str = target_level_list[0] if target_level_list else target_info.get("level", "")
+            
+            current_stage = str(digi.stage or "").lower()
+            target_stage = str(target_level_str or "").lower()
             
             # Mapping API terms to Internal terms
             api_to_internal = {
