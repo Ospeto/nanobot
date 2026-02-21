@@ -161,8 +161,15 @@ class CronService:
                 for j in self._store.jobs
             ]
         }
-        
-        self.store_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        json_str = json.dumps(data, indent=2, ensure_ascii=False)
+        def _write():
+            self.store_path.write_text(json_str, encoding="utf-8")
+            
+        try:
+            loop = asyncio.get_running_loop()
+            loop.run_in_executor(None, _write)
+        except RuntimeError:
+            _write()
     
     async def start(self) -> None:
         """Start the cron service."""

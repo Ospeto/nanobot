@@ -546,7 +546,7 @@ class AgentLoop:
         logger.info("Processing message from {}:{}: {}", msg.channel, msg.sender_id, preview)
 
         key = session_key or msg.session_key
-        session = self.sessions.get_or_create(key)
+        session = await asyncio.to_thread(self.sessions.get_or_create, key)
 
         # Handle slash commands
         cmd = msg.content.strip().lower()
@@ -554,7 +554,7 @@ class AgentLoop:
             # Capture messages before clearing (avoid race condition with background task)
             messages_to_archive = session.messages.copy()
             session.clear()
-            self.sessions.save(session)
+            await asyncio.to_thread(self.sessions.save, session)
             self.sessions.invalidate(session.key)
 
             async def _consolidate_and_cleanup():
@@ -639,7 +639,7 @@ class AgentLoop:
         session.add_message("user", msg.content)
         session.add_message("assistant", final_content,
                             tools_used=tools_used if tools_used else None)
-        self.sessions.save(session)
+        await asyncio.to_thread(self.sessions.save, session)
 
         if message_tool := self.tools.get("message"):
             if isinstance(message_tool, MessageTool) and message_tool._sent_in_turn:
@@ -672,7 +672,7 @@ class AgentLoop:
             origin_chat_id = msg.chat_id
 
         session_key = f"{origin_channel}:{origin_chat_id}"
-        session = self.sessions.get_or_create(session_key)
+        session = await asyncio.to_thread(self.sessions.get_or_create, session_key)
         self._set_tool_context(origin_channel, origin_chat_id, msg.metadata.get("message_id"))
         initial_messages = await self.context.build_messages(
             history=session.get_history(max_messages=self.memory_window),
@@ -687,7 +687,7 @@ class AgentLoop:
 
         session.add_message("user", f"[System: {msg.sender_id}] {msg.content}")
         session.add_message("assistant", final_content)
-        self.sessions.save(session)
+        await asyncio.to_thread(self.sessions.save, session)
 
         return OutboundMessage(
             channel=origin_channel,
@@ -731,7 +731,7 @@ class AgentLoop:
             tools = f" [tools: {', '.join(m['tools_used'])}]" if m.get("tools_used") else ""
             lines.append(f"[{m.get('timestamp', '?')[:16]}] {m['role'].upper()}{tools}: {m['content']}")
         conversation = "\n".join(lines)
-        current_memory = memory.read_long_term()
+        current_memory = await asyncio.to_thread(memory.read_long_term)
 
         prompt = f"""You are a memory consolidation agent. Process this conversation and return a JSON object with exactly two keys:
 
@@ -778,13 +778,13 @@ Respond with ONLY valid JSON, no markdown fences."""
                 # Defensive: ensure entry is a string (LLM may return dict)
                 if not isinstance(entry, str):
                     entry = json.dumps(entry, ensure_ascii=False)
-                memory.append_history(entry)
+                await asyncio.to_thread(memory.append_history, entry)
             if update := result.get("memory_update"):
                 # Defensive: ensure update is a string
                 if not isinstance(update, str):
                     update = json.dumps(update, ensure_ascii=False)
                 if update != current_memory:
-                    memory.write_long_term(update)
+                    await asyncio.to_thread(memory.write_long_term, update)
 
             if archive_all:
                 session.last_consolidated = 0
