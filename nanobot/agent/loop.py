@@ -138,10 +138,9 @@ class AgentLoop:
 
         # Game tools (for Digimon companion)
         try:
-            from nanobot.agent.tools.game import FeedTool, HealTool, PlayTool, ListTasksTool, CompleteTaskTool, AddAssignmentTool
-            from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
             from nanobot.agent.tools.init import InitDigimonTool
             from nanobot.agent.tools.calendar import BlockTimeTool, ListCalendarTool, ManageCalendarTool
+            from nanobot.agent.tools.study import SyncStudyResourcesTool, AnalyzeStudyScheduleTool
             
             self.tools.register(FeedTool())
             self.tools.register(HealTool())
@@ -155,6 +154,8 @@ class AgentLoop:
             self.tools.register(BlockTimeTool())
             self.tools.register(ListCalendarTool())
             self.tools.register(ManageCalendarTool())
+            self.tools.register(SyncStudyResourcesTool())
+            self.tools.register(AnalyzeStudyScheduleTool())
         except ImportError as e:
             logger.error(f"Failed to import game tools: {e}")
     async def _connect_mcp(self) -> None:
@@ -449,6 +450,45 @@ class AgentLoop:
             except Exception as e:
                 logger.error(f"Proactive Calendar loop error: {e}")
 
+    async def _proactive_study_loop(self) -> None:
+        """Loop that proactively analyzes study schedule and nudges the Tamer."""
+        logger.info("Starting proactive study loop")
+        # Initial delay to avoid spamming at startup
+        await asyncio.sleep(60)
+        
+        while self._running:
+            try:
+                from nanobot.game.study_logic import StudyPlanner
+                planner = StudyPlanner()
+                suggestions = planner.analyze_schedule()
+                
+                if suggestions:
+                    # Pick the most imminent suggestion
+                    s = suggestions[0]
+                    
+                    message = f"TAMER! 🎓 I've been analyzing your schedule. You have {s['course']} coming up!\n\n"
+                    message += f"Smart Study Window: {s['suggested_prep']}\n"
+                    if s["materials"]:
+                        message += "I found these materials for you:\n"
+                        for m in s["materials"]:
+                            message += f"🔗 {m['title']}: {m['url']}\n"
+                    
+                    message += "\nShall I block this time on your calendar for a focused study session?"
+                    
+                    # Send message to all active sessions
+                    active_sessions = self.sessions.list_active_sessions()
+                    for session in active_sessions:
+                        await self.bus.publish_outbound(OutboundMessage(
+                            session_id=session.id,
+                            text=message
+                        ))
+                
+                # Run every 4 hours
+                await asyncio.sleep(4 * 3600)
+            except Exception as e:
+                logger.error(f"Error in proactive study loop: {e}")
+                await asyncio.sleep(300)
+
     async def _proactive_daily_scheduler_loop(self):
         """Background task to proactively recommend a daily time-blocked schedule."""
         while self._running:
@@ -490,6 +530,7 @@ class AgentLoop:
         asyncio.create_task(self._proactive_mas_alerts_loop())
         asyncio.create_task(self._proactive_calendar_alerts_loop())
         asyncio.create_task(self._proactive_daily_scheduler_loop())
+        asyncio.create_task(self._proactive_study_loop())
 
         while self._running:
             try:

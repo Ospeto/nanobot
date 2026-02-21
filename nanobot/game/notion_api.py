@@ -168,3 +168,59 @@ class NotionIntegration:
         except Exception as e:
             print(f"Error creating Notion assignment: {e}")
             return None
+
+    def fetch_study_materials(self) -> dict:
+        """Fetch all study materials from Courses and Notes databases."""
+        if not self.is_authenticated():
+            return {}
+            
+        resources = {}
+        course_id_to_name = {}
+        
+        # 1. Fetch from Courses to build the ID map
+        course_db_id = "29a0cc17-6cb9-817d-856a-d76eaae22769"
+        url = f"https://api.notion.com/v1/databases/{course_db_id}/query"
+        try:
+            response = requests.post(url, json={}, headers=self.headers)
+            response.raise_for_status()
+            for r in response.json().get("results", []):
+                props = r.get("properties", {})
+                name_prop = props.get("Name", {}).get("title", [])
+                name = name_prop[0].get("plain_text") if name_prop else "Unknown Course"
+                course_id_to_name[r["id"]] = name
+                
+                # Check Syllabus (Files)
+                files = props.get("Syllabus", {}).get("files", [])
+                for f in files:
+                    file_url = f.get("file", {}).get("url") or f.get("external", {}).get("url")
+                    if file_url:
+                        if name not in resources: resources[name] = []
+                        resources[name].append({"title": f.get("name", "Syllabus"), "url": file_url})
+        except Exception as e:
+            print(f"Error fetching Course resources: {e}")
+
+        # 2. Fetch from Notes and map them to courses
+        notes_db_id = "29a0cc17-6cb9-81f0-8243-eeba9a314ea7"
+        url = f"https://api.notion.com/v1/databases/{notes_db_id}/query"
+        try:
+            response = requests.post(url, json={}, headers=self.headers)
+            response.raise_for_status()
+            for r in response.json().get("results", []):
+                props = r.get("properties", {})
+                name_prop = props.get("Name", {}).get("title", [])
+                note_name = name_prop[0].get("plain_text") if name_prop else "Note"
+                note_url = r.get("url")
+                
+                course_rels = props.get("Course", {}).get("relation", [])
+                for rel in course_rels:
+                    course_id = rel.get("id")
+                    course_name = course_id_to_name.get(course_id)
+                    if course_name:
+                        if course_name not in resources: resources[course_name] = []
+                        # Avoid duplicates
+                        if not any(l["url"] == note_url for l in resources[course_name]):
+                            resources[course_name].append({"title": f"Note: {note_name}", "url": note_url})
+        except Exception as e:
+            print(f"Error fetching Notes resources: {e}")
+            
+        return resources
