@@ -309,12 +309,25 @@
             gap: 8px;
             width: 95vw;
             max-width: 500px;
-            justify-content: space-between;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 5px;
+            /* for scrollbar */
             z-index: 20;
         }
 
+        .software-nav::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .software-nav::-webkit-scrollbar-thumb {
+            background: #4fc3cd;
+            border-radius: 4px;
+        }
+
         .nav-btn {
-            flex: 1;
+            flex: 0 0 auto;
+            min-width: 80px;
             background: rgba(11, 55, 69, 0.8);
             backdrop-filter: blur(5px);
             color: #4fc3cd;
@@ -582,6 +595,8 @@
     <!-- Software App Navigation (bottom row) -->
     <div class="software-nav" id="software-nav">
         <div class="nav-btn active" onclick="closeModals()">HOME</div>
+        <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
+        <div class="nav-btn" onclick="openModal('evo')">EVO</div>
         <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
         <div class="nav-btn" onclick="openModal('roster')">TEAM</div>
         <div class="nav-btn" onclick="openModal('farm')">FARM</div>
@@ -698,6 +713,18 @@
         </div>
     </div>
 
+    <div id="stats-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>// V-PET STATS</span>
+                <button class="close-btn" onclick="closeModals()">✕</button>
+            </div>
+            <div class="modal-body" id="stats-container" style="color: #4fc3cd; text-align: left;">
+                <!-- Dynamically populated via fetchStats() -->
+            </div>
+        </div>
+    </div>
+
     <!-- Custom Toast Notification Container -->
     <div id="cyber-toast" class="cyber-toast"></div>
 
@@ -757,6 +784,8 @@
                 fetchIncubator();
             } else if (id === 'dterm') {
                 fetchInventory();
+            } else if (id === 'stats') {
+                fetchStats();
             }
         }
 
@@ -1128,11 +1157,13 @@
         }
 
         // Vitals Fetching
+        let cachedVitals = null;
         async function fetchVitals() {
             try {
                 const res = await fetch('/twa/api/vitals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: getInitData() }) });
                 if (res.ok) {
                     const d = await res.json();
+                    cachedVitals = d.active_digimon;
 
                     if (d.active_digimon.name === 'Digitama') {
                         lcdMenus = ['HATCH'];
@@ -1152,6 +1183,8 @@
 
                         document.getElementById('software-nav').innerHTML = `
                             <div class="nav-btn active" onclick="closeModals()">HOME</div>
+                            <div class="nav-btn" onclick="openModal('quest')">QUEST</div>
+                            <div class="nav-btn" onclick="openModal('evo')">EVO</div>
                             <div class="nav-btn" onclick="openModal('shop')">SHOP</div>
                             <div class="nav-btn" onclick="openModal('roster')">TEAM</div>
                             <div class="nav-btn" onclick="openModal('farm')">FARM</div>
@@ -1357,6 +1390,32 @@
             }
         }
 
+        function fetchStats() {
+            const container = document.getElementById('stats-container');
+            if (!cachedVitals) {
+                container.innerHTML = '<div style="text-align:center; color:red;">NO DATA AVAILABLE</div>';
+                return;
+            }
+            container.innerHTML = `
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom: 15px; border-bottom: 1px solid #4fc3cd; padding-bottom: 15px;">
+                    <img src="${cachedVitals.sprite}" style="width: 60px; height: 60px; background: rgba(255,255,255,0.8); border-radius: 8px; padding: 5px;">
+                    <div>
+                        <strong style="font-size: 1.2em; color: #fff;">${cachedVitals.name.toUpperCase()}</strong><br>
+                        Level: ${cachedVitals.level} | Stage: ${cachedVitals.stage || 'N/A'}
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em;">
+                    <div><strong>ATTRIBUTE:</strong> <span style="color:#fff;">${cachedVitals.attribute || 'N/A'}</span></div>
+                    <div><strong>ELEMENT:</strong> <span style="color:#fff;">${cachedVitals.element || 'N/A'}</span></div>
+                    <div><strong>HP:</strong> <span style="color:#fff;">${cachedVitals.hp}%</span></div>
+                    <div><strong>BOND:</strong> <span style="color:#fff;">${cachedVitals.bond || 0}</span></div>
+                    <div><strong>HUNGER:</strong> <span style="color:#fff;">${cachedVitals.hunger || 0}/100</span></div>
+                    <div><strong>ENERGY:</strong> <span style="color:#fff;">${cachedVitals.energy || 0}/100</span></div>
+                    <div><strong>EXP:</strong> <span style="color:#fff;">${cachedVitals.exp || 0}</span></div>
+                </div>
+            `;
+        }
+
         function lcdSelect() {
             bounceSprite();
             if (lcdState === 'MENU') {
@@ -1388,7 +1447,7 @@
                     openModal('quest');
                     lcdState = 'IDLE';
                 } else if (action === 'STATS') {
-                    openModal('evo');
+                    openModal('stats');
                     lcdState = 'IDLE';
                 }
             } else if (lcdState === 'IDLE') {

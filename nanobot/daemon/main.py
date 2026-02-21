@@ -79,6 +79,10 @@ async def twa_get_vitals(request: Request):
                     "hunger": active.hunger,
                     "bond": active.bond,
                     "level": active.level,
+                    "exp": active.exp,
+                    "stage": active.stage,
+                    "attribute": active.attribute,
+                    "element": active.element,
                     "sprite": f"/twa/api/sprite/{sprite_name}",
                     "bits": inv.bits
                 }
