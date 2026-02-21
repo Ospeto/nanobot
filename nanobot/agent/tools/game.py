@@ -181,9 +181,9 @@ class ListTasksTool(Tool):
             if not tasks:
                 return "You have ZERO pending tasks! Good job! Tell the user they are completely clear."
                 
-            google_tasks = [f"{t.title} (ID: {t.id})" for t in tasks]
+            task_lines = [f"{i+1}. {t.title}" for i, t in enumerate(tasks)]
             
-            output = "**Google Tasks:**\n" + "\n".join(f"- {t}" for t in google_tasks)
+            output = "**Google Tasks:**\n" + "\n".join(f"- {t}" for t in task_lines)
             return f"PENDING TASKS:\n{output}\n\nTell the human they need to finish these to gain EXP and Food!"
         finally:
             db.close()

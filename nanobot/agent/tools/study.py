@@ -165,3 +165,63 @@ class IntrospectCoursesTool(Tool):
         except Exception as e:
             return f"Error introspecting courses: {e}"
 
+class UpdateCourseFieldTool(Tool):
+    @property
+    def name(self) -> str:
+        return "update_course_field"
+        
+    @property
+    def description(self) -> str:
+        return "Update a missing field on a MAS course in Notion. Use this when the Tamer tells you a missing piece of info (like schedule or professor name). First use introspect_courses to get the course ID."
+        
+    @property
+    def parameters(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "course_name": {
+                    "type": "string",
+                    "description": "The course name to update (e.g., 'MAS 121 - Inferential Statistics')"
+                },
+                "field_name": {
+                    "type": "string",
+                    "description": "The field to update: 'Schedule' or 'Professor'",
+                    "enum": ["Schedule", "Professor"]
+                },
+                "value": {
+                    "type": "string",
+                    "description": "The value to set (e.g., 'Mon & Thu 9:30-11:00 AM')"
+                }
+            },
+            "required": ["course_name", "field_name", "value"]
+        }
+        
+    async def execute(self, course_name: str = "", field_name: str = "", value: str = "", **kwargs) -> str:
+        try:
+            from nanobot.game.notion_api import NotionIntegration
+            notion = NotionIntegration()
+            courses = notion.fetch_course_metadata()
+            
+            # Find the course by name (fuzzy)
+            target = None
+            course_name_upper = course_name.upper()
+            for c in courses:
+                if c["name"].upper() in course_name_upper or course_name_upper in c["name"].upper():
+                    target = c
+                    break
+                # Also try matching course code
+                code = c["name"].upper().split("-")[0].strip()
+                if code in course_name_upper:
+                    target = c
+                    break
+            
+            if not target:
+                return f"Course '{course_name}' not found. Available: {', '.join(c['name'] for c in courses)}"
+            
+            success = notion.update_course_property(target["id"], field_name, value)
+            if success:
+                return f"SUCCESS: Updated '{field_name}' for {target['name']} to '{value}' in Notion!"
+            else:
+                return f"Failed to update Notion. Check API permissions."
+        except Exception as e:
+            return f"Error updating course field: {e}"

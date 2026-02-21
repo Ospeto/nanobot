@@ -142,7 +142,7 @@ class AgentLoop:
             from nanobot.agent.tools.second_brain import ManageMemoryGraphTool, SearchMemoryGraphTool
             from nanobot.agent.tools.init import InitDigimonTool
             from nanobot.agent.tools.calendar import BlockTimeTool, ListCalendarTool, ManageCalendarTool
-            from nanobot.agent.tools.study import SyncStudyResourcesTool, AnalyzeStudyScheduleTool, IntrospectCoursesTool
+            from nanobot.agent.tools.study import SyncStudyResourcesTool, AnalyzeStudyScheduleTool, IntrospectCoursesTool, UpdateCourseFieldTool
             
             self.tools.register(FeedTool())
             self.tools.register(HealTool())
@@ -159,6 +159,7 @@ class AgentLoop:
             self.tools.register(SyncStudyResourcesTool())
             self.tools.register(AnalyzeStudyScheduleTool())
             self.tools.register(IntrospectCoursesTool())
+            self.tools.register(UpdateCourseFieldTool())
         except ImportError as e:
             logger.error(f"Failed to import game tools: {e}")
     async def _connect_mcp(self) -> None:
@@ -509,7 +510,55 @@ class AgentLoop:
                 logger.error(f"Error in proactive study loop: {e}")
                 await asyncio.sleep(300)
 
-
+    async def _proactive_data_gap_loop(self) -> None:
+        """Proactively ask the Tamer about ONE missing course field at a time."""
+        logger.info("Starting proactive data-gap-filling loop")
+        await asyncio.sleep(120)  # Wait 2 min after boot
+        
+        while self._running:
+            try:
+                from nanobot.game.notion_api import NotionIntegration
+                notion = NotionIntegration()
+                courses = notion.fetch_course_metadata()
+                
+                active = [c for c in courses if c["status"] == "In Progress"]
+                
+                # Find the first missing field across active courses
+                # Priority: Schedule > Professor (Syllabus can't be filled via text)
+                gap = None
+                for c in active:
+                    if not c.get("schedule"):
+                        gap = {"course": c["name"], "field": "Schedule", "question": f"What days and times is **{c['name']}** held? (e.g., 'Mon & Thu 9:30-11:00 AM')"}
+                        break
+                    if not c.get("professor"):
+                        gap = {"course": c["name"], "field": "Professor", "question": f"Who is the professor for **{c['name']}**?"}
+                        break
+                
+                if gap:
+                    sessions = self.sessions.list_sessions()
+                    if sessions:
+                        session_key = sessions[0].get("key", "")
+                        parts = session_key.split(":", 1)
+                        if len(parts) == 2:
+                            channel, chat_id = parts
+                            alert_text = f"DATA GAP ALERT: One of Tamer's active courses is missing important info. "
+                            alert_text += f"Ask them specifically: {gap['question']} "
+                            alert_text += f"When they answer, use the update_course_field tool with course_name='{gap['course']}' and field_name='{gap['field']}' to save it to Notion."
+                            
+                            msg = InboundMessage(
+                                channel=channel,
+                                sender_id="system",
+                                chat_id=chat_id,
+                                content=alert_text
+                            )
+                            logger.info(f"Asking about missing {gap['field']} for {gap['course']}")
+                            await self.bus.publish_inbound(msg)
+                
+                # Wait 6 hours before asking about the next gap
+                await asyncio.sleep(6 * 3600)
+            except Exception as e:
+                logger.error(f"Error in data-gap loop: {e}")
+                await asyncio.sleep(600)
 
     async def _proactive_daily_scheduler_loop(self):
         """Background task to proactively recommend a daily time-blocked schedule."""
@@ -553,6 +602,7 @@ class AgentLoop:
         asyncio.create_task(self._proactive_calendar_alerts_loop())
         asyncio.create_task(self._proactive_daily_scheduler_loop())
         asyncio.create_task(self._proactive_study_loop())
+        asyncio.create_task(self._proactive_data_gap_loop())
 
         while self._running:
             try:

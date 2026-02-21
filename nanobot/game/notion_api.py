@@ -296,3 +296,28 @@ class NotionIntegration:
         
         return courses
 
+    def update_course_property(self, page_id: str, property_name: str, value: str) -> bool:
+        """Update a text property on a Notion Course page."""
+        if not self.is_authenticated():
+            return False
+        
+        url = f"https://api.notion.com/v1/pages/{page_id}"
+        payload = {
+            "properties": {
+                property_name: {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {"content": value}
+                        }
+                    ]
+                }
+            }
+        }
+        try:
+            response = requests.patch(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            print(f"Error updating course property: {e}")
+            return False
