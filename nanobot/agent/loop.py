@@ -398,8 +398,11 @@ class AgentLoop:
                         if not start_str: 
                             continue # Ignore all-day events
                         
-                        start_time = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                        seconds_until = (start_time - now).total_seconds()
+                        if start_str.endswith('Z'):
+                            start_str = start_str[:-1] + '+00:00'
+                        start_time = datetime.fromisoformat(start_str)
+                        start_time_utc = start_time.astimezone(timezone.utc)
+                        seconds_until = (start_time_utc - now).total_seconds()
                         
                         # If starting in less than 5 minutes
                         if 0 <= seconds_until <= 300:
