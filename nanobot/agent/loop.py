@@ -382,7 +382,7 @@ class AgentLoop:
                 
                 from nanobot.game.google_api import GoogleIntegration
                 google = GoogleIntegration()
-                events = google.get_upcoming_events()
+                events = await asyncio.to_thread(google.get_upcoming_events)
                 if not events:
                     continue
                     
@@ -391,40 +391,48 @@ class AgentLoop:
                 
                 from nanobot.game.database import SessionLocal
                 from nanobot.game import models
-                db = SessionLocal()
-                try:
-                    for e in events:
-                        start_str = e['start'].get('dateTime')
-                        if not start_str: 
-                            continue # Ignore all-day events
-                        
-                        if start_str.endswith('Z'):
-                            start_str = start_str[:-1] + '+00:00'
-                        start_time = datetime.fromisoformat(start_str)
-                        start_time_utc = start_time.astimezone(timezone.utc)
-                        seconds_until = (start_time_utc - now).total_seconds()
-                        
-                        # If starting in less than 5 minutes
-                        if 0 <= seconds_until <= 300:
-                            state_id = f"cal_alert_{e['id']}"
-                            state = db.query(models.TaskSyncState).filter_by(id=state_id).first()
-                            if not state:
-                                state = models.TaskSyncState(id=state_id, source="calendar", title=e.get('summary', ''), status="alerted", task_type="event")
-                                db.add(state)
-                                db.commit()
-                                
-                                alert_text = f"PROACTIVE SYSTEM ALERT: TAMER! A time block called '{e.get('summary', 'Unknown')}' is starting in {int(seconds_until//60)} minutes! This is your Combat Zone! Tell the Tamer to drop everything and FOCUS!"
-                                msg = InboundMessage(
-                                    channel=channel,
-                                    sender_id="system",
-                                    chat_id=chat_id,
-                                    content=alert_text
-                                )
-                                logger.info(f"Triggering proactive Calendar alert for {e.get('summary', 'Unknown')}")
-                                await self.bus.publish_inbound(msg)
-                                break
-                finally:
-                    db.close()
+                
+                def _check_and_mark_alert(eid: str, summary: str) -> bool:
+                    db = SessionLocal()
+                    try:
+                        state_id = f"cal_alert_{eid}"
+                        state = db.query(models.TaskSyncState).filter_by(id=state_id).first()
+                        if not state:
+                            state = models.TaskSyncState(id=state_id, source="calendar", title=summary, status="alerted", task_type="event")
+                            db.add(state)
+                            db.commit()
+                            return True
+                        return False
+                    finally:
+                        db.close()
+
+                for e in events:
+                    start_str = e['start'].get('dateTime')
+                    if not start_str: 
+                        continue # Ignore all-day events
+                    
+                    if start_str.endswith('Z'):
+                        start_str = start_str[:-1] + '+00:00'
+                    start_time = datetime.fromisoformat(start_str)
+                    start_time_utc = start_time.astimezone(timezone.utc)
+                    seconds_until = (start_time_utc - now).total_seconds()
+                    
+                    # If starting in less than 5 minutes
+                    if 0 <= seconds_until <= 300:
+                        is_new = await asyncio.to_thread(_check_and_mark_alert, e['id'], e.get('summary', ''))
+                        if is_new:
+                            # Sanitize summary just in case
+                            clean_summary = str(e.get('summary', 'Unknown')).replace('{', '{{').replace('}', '}}')
+                            alert_text = f"PROACTIVE SYSTEM ALERT: TAMER! A time block called '{clean_summary}' is starting in {int(seconds_until//60)} minutes! This is your Combat Zone! Tell the Tamer to drop everything and FOCUS!"
+                            msg = InboundMessage(
+                                channel=channel,
+                                sender_id="system",
+                                chat_id=chat_id,
+                                content=alert_text
+                            )
+                            logger.info(f"Triggering proactive Calendar alert for {clean_summary}")
+                            await self.bus.publish_inbound(msg)
+                            break
             except Exception as e:
                 logger.error(f"Proactive Calendar loop error: {e}")
 

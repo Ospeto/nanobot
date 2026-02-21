@@ -14,7 +14,7 @@ class GoogleIntegration:
         self.token_pth = os.path.join(self.config_dir, 'token.json')
         self.credentials_pth = os.path.join(self.config_dir, 'credentials.json')
 
-    def authenticate(self):
+    def authenticate(self, quiet: bool = False) -> bool:
         if os.path.exists(self.token_pth):
             try:
                 self.creds = Credentials.from_authorized_user_file(self.token_pth, SCOPES)
@@ -27,11 +27,13 @@ class GoogleIntegration:
                 with open(self.token_pth, 'w') as token:
                     token.write(self.creds.to_json())
             except Exception as e:
-                print(f"Error refreshing Google Token: {e}")
+                if not quiet:
+                    print(f"Error refreshing Google Token: {e}")
                 self.creds = None
             
         if not self.creds or not self.creds.valid:
-            print("Google API not authenticated. Please place credentials.json in ~/.digimon and run auth.")
+            if not quiet:
+                print("Google API not authenticated. Please place credentials.json in ~/.digimon and run auth.")
             return False
             
         return True
@@ -121,7 +123,8 @@ class GoogleIntegration:
             return None
 
     def get_upcoming_events(self):
-        if not self.authenticate():
+        # We pass quiet=True so the background loop doesn't spam logs every 60s
+        if not self.authenticate(quiet=True):
             return []
             
         try:
@@ -139,6 +142,12 @@ class GoogleIntegration:
     def create_event(self, summary: str, start_time: str, end_time: str, description: str = ''):
         if not self.authenticate():
             return None
+            
+        # Enforce timezone robustness for naive LLM outputs
+        if len(start_time) > 10 and not start_time.endswith('Z') and '+' not in start_time and '-' not in start_time[10:]:
+            start_time += 'Z'
+        if len(end_time) > 10 and not end_time.endswith('Z') and '+' not in end_time and '-' not in end_time[10:]:
+            end_time += 'Z'
             
         try:
             service = build('calendar', 'v3', credentials=self.creds, cache_discovery=False)
@@ -187,9 +196,18 @@ class GoogleIntegration:
             if description is not None:
                 event['description'] = description
             if start_time is not None:
-                event['start']['dateTime'] = start_time
+                if len(start_time) > 10 and not start_time.endswith('Z') and '+' not in start_time and '-' not in start_time[10:]:
+                    start_time += 'Z'
+                # Clear all-day date property if present, otherwise API throws 400 Bad Request
+                if 'date' in event.get('start', {}):
+                    event['start'].pop('date')
+                event.setdefault('start', {})['dateTime'] = start_time
             if end_time is not None:
-                event['end']['dateTime'] = end_time
+                if len(end_time) > 10 and not end_time.endswith('Z') and '+' not in end_time and '-' not in end_time[10:]:
+                    end_time += 'Z'
+                if 'date' in event.get('end', {}):
+                    event['end'].pop('date')
+                event.setdefault('end', {})['dateTime'] = end_time
                 
             updated_event = service.events().update(calendarId='primary', eventId=event_id, body=event).execute()
             return updated_event
