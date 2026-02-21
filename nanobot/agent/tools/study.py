@@ -47,19 +47,25 @@ class AnalyzeStudyScheduleTool(Tool):
     async def execute(self, **kwargs) -> str:
         try:
             planner = StudyPlanner()
+            # Auto-sync resources before analyzing
+            planner.sync_from_notion()
             suggestions = planner.analyze_schedule()
             if not suggestions:
-                return "Your schedule looks clear! No upcoming classes or deadlines detected in the immediate future."
+                return "Your schedule looks clear! No upcoming classes, assignments, or exams detected."
                 
-            output = ["SMART STUDY ANALYSIS:"]
+            output = ["🎓 SMART STUDY ANALYSIS (sorted by priority):"]
             for s in suggestions:
-                output.append(f"Subject: {s['course']}")
-                output.append(f"- Proactive Prep Time: {s['suggested_prep']}")
+                urgency_icon = "🔴" if s.get("urgency") == "CRITICAL" else "🟡" if s.get("urgency") == "HIGH" else "🟢"
+                output.append(f"\n{urgency_icon} [{s.get('urgency', '?')}] {s.get('type', '?')}: {s['course']}")
+                output.append(f"  Due/Start: {s['class_time']} ({s.get('days_until', '?')} days)")
+                output.append(f"  Suggested Prep: {s['suggested_prep']}")
                 if s["materials"]:
-                    output.append("- Materials Found:")
-                    for m in s["materials"]:
-                        output.append(f"  * {m['title']}: {m['url']}")
-                output.append(f"- Reasoning: {s['reason']}\n")
+                    output.append(f"  📚 {len(s['materials'])} study materials found:")
+                    for m in s["materials"][:3]:  # Show top 3
+                        output.append(f"    🔗 {m['title']}: {m['url']}")
+                    if len(s["materials"]) > 3:
+                        output.append(f"    ... and {len(s['materials']) - 3} more")
+                output.append(f"  💡 {s['reason']}")
                 
             return "\n".join(output)
         except Exception as e:

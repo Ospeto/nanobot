@@ -72,12 +72,14 @@ class SyncManager:
         current_ids = {t.get("id"): t for t in tasks if t.get("id")}
         existing_ids = {ex.id: ex for ex in existing}
         
+        # Tasks that disappeared from the API were completed on Google's side
         for ex in existing:
             if ex.id not in current_ids and ex.status == "pending":
                 ex.status = "completed"
                 enemy = Enemy(task_source="google_tasks", task_id=ex.id, title=ex.title, status="completed")
                 resolve_combat(db, enemy)
                 
+        # New tasks that appeared
         for t_id, t_data in current_ids.items():
             if t_id not in existing_ids:
                 new_task = models.TaskSyncState(
@@ -88,13 +90,12 @@ class SyncManager:
                     attribute=Enemy("google_tasks", t_id, t_data.get("title", ""), "pending").attribute
                 )
                 db.add(new_task)
-            elif existing_ids[t_id].status != "pending":
-                existing_ids[t_id].status = "pending"
         
         try:
             db.commit()
         except Exception:
             db.rollback()
+
 
 
 

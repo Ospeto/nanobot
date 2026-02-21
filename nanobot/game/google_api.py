@@ -59,6 +59,7 @@ class GoogleIntegration:
             return []
             
         try:
+            service = build('tasks', 'v1', credentials=self.creds, cache_discovery=False)
             results = service.tasklists().list(maxResults=10).execute()
             items = results.get('items', [])
             if not items:
