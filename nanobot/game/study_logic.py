@@ -22,12 +22,12 @@ class StudyPlanner:
             json.dump(resources, f, indent=2)
             
     def sync_from_notion(self) -> dict:
+        """Sync study materials — REPLACES cache with only active courses."""
         notion = NotionIntegration()
-        new_resources = notion.fetch_study_materials()
-        current = self.load_resources()
-        current.update(new_resources)
-        self.save_resources(current)
-        return current
+        new_resources = notion.fetch_study_materials()  # Only returns "In Progress" courses
+        # Full replace, not merge — so completed courses are purged from cache
+        self.save_resources(new_resources)
+        return new_resources
 
     def analyze_schedule(self) -> list:
         """Extremely smart analysis combining Calendar events AND Notion deadlines.

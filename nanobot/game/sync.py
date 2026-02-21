@@ -79,7 +79,7 @@ class SyncManager:
                 enemy = Enemy(task_source="google_tasks", task_id=ex.id, title=ex.title, status="completed")
                 resolve_combat(db, enemy)
                 
-        # New tasks that appeared
+        # New tasks or re-appeared tasks
         for t_id, t_data in current_ids.items():
             if t_id not in existing_ids:
                 new_task = models.TaskSyncState(
@@ -90,6 +90,10 @@ class SyncManager:
                     attribute=Enemy("google_tasks", t_id, t_data.get("title", ""), "pending").attribute
                 )
                 db.add(new_task)
+            elif existing_ids[t_id].status != "pending":
+                # Task is in the API (incomplete), so mark as pending
+                existing_ids[t_id].status = "pending"
+                existing_ids[t_id].title = t_data.get("title", existing_ids[t_id].title)
         
         try:
             db.commit()
