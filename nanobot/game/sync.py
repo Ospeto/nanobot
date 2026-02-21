@@ -91,7 +91,10 @@ class SyncManager:
             elif existing_ids[t_id].status != "pending":
                 existing_ids[t_id].status = "pending"
         
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
 
 
 

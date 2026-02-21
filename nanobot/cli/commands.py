@@ -348,9 +348,11 @@ def gateway(
     # Initialize game database
     try:
         from nanobot.game.database import init_db
+        from nanobot.game.sync import SyncManager
         init_db()
+        sync_manager = SyncManager()
     except ImportError:
-        pass
+        sync_manager = None
         
     bus = MessageBus()
     provider = _make_provider(config)
@@ -427,10 +429,14 @@ def gateway(
         try:
             await cron.start()
             await heartbeat.start()
-            await asyncio.gather(
+            tasks_to_run = [
                 agent.run(),
                 channels.start_all(),
-            )
+            ]
+            if sync_manager:
+                tasks_to_run.append(sync_manager.run_sync_loop())
+                
+            await asyncio.gather(*tasks_to_run)
         except KeyboardInterrupt:
             console.print("\nShutting down...")
         finally:
@@ -444,6 +450,17 @@ def gateway(
 
 
 
+
+@app.command()
+def google_auth():
+    """Authenticate with Google Calendar and Tasks."""
+    console.print("[bold blue]Starting Google OAuth2 Authentication Flow...[/bold blue]")
+    from nanobot.game.google_api import GoogleIntegration
+    google = GoogleIntegration()
+    if google.run_auth_flow():
+        console.print("[bold green]Success![/bold green] Your Nanobot is now connected to Google.")
+    else:
+        console.print("[bold red]Authentication failed.[/bold red] Ensure credentials.json is in ~/.digimon/")
 
 # ============================================================================
 # Agent Commands

@@ -18,6 +18,10 @@ This file stores important information that should persist across sessions.
 
 (Things to remember)
 
+## [Koromon's Journal]
+
+(Koromon's personal thoughts and partner-specific memories will go here)
+
 ---
 
 *This file is automatically updated by nanobot when important information should be remembered.*

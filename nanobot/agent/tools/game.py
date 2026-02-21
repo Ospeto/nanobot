@@ -161,11 +161,23 @@ class ListTasksTool(Tool):
             return "Game module not available."
         db = SessionLocal()
         try:
-            from nanobot.game import models
+            from nanobot.game import models, sync
+            
+            # Initial check
             tasks = db.query(models.TaskSyncState).filter(
                 models.TaskSyncState.status == "pending",
                 models.TaskSyncState.source == "google_tasks"
             ).all()
+            
+            # If empty, try one immediate sync trigger
+            if not tasks:
+                sm = sync.SyncManager()
+                await sm.sync_google_tasks(db)
+                tasks = db.query(models.TaskSyncState).filter(
+                    models.TaskSyncState.status == "pending",
+                    models.TaskSyncState.source == "google_tasks"
+                ).all()
+
             if not tasks:
                 return "You have ZERO pending tasks! Good job! Tell the user they are completely clear."
                 

@@ -3,6 +3,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from loguru import logger
 
 SCOPES = ['https://www.googleapis.com/auth/tasks', 'https://www.googleapis.com/auth/calendar']
 
@@ -33,9 +34,24 @@ class GoogleIntegration:
             
         if not self.creds or not self.creds.valid:
             if not quiet:
-                print("Google API not authenticated. Please place credentials.json in ~/.digimon and run auth.")
+                logger.warning("Google API not authenticated. Please run 'nanobot google-auth'.")
             return False
             
+        return True
+
+    def run_auth_flow(self):
+        """Run the manual OAuth2 flow to generate token.json."""
+        if not os.path.exists(self.credentials_pth):
+            logger.error(f"Credentials not found at {self.credentials_pth}")
+            return False
+            
+        flow = InstalledAppFlow.from_client_secrets_file(self.credentials_pth, SCOPES)
+        self.creds = flow.run_local_server(port=0)
+        
+        with open(self.token_pth, 'w') as token:
+            token.write(self.creds.to_json())
+            
+        logger.info(f"Authentication successful! Token saved to {self.token_pth}")
         return True
 
     def get_tasks(self):
@@ -43,7 +59,6 @@ class GoogleIntegration:
             return []
             
         try:
-            service = build('tasks', 'v1', credentials=self.creds, cache_discovery=False)
             results = service.tasklists().list(maxResults=10).execute()
             items = results.get('items', [])
             if not items:
