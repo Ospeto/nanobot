@@ -39,7 +39,12 @@ async def serve_digivice():
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         with open(index_path, "r") as f:
-            return f.read()
+            content = f.read()
+        return HTMLResponse(content=content, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        })
     return "<h1>Digivice Not Initialized</h1>"
 
 @app.post("/webhook/telegram")
