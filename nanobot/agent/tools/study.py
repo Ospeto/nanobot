@@ -46,6 +46,15 @@ class AnalyzeStudyScheduleTool(Tool):
         
     async def execute(self, **kwargs) -> str:
         try:
+            import datetime as dt
+            from zoneinfo import ZoneInfo
+            
+            tz = ZoneInfo("Asia/Yangon")
+            now = dt.datetime.now(tz)
+            day_name = now.strftime("%A")  # e.g., "Sunday"
+            date_str = now.strftime("%B %d, %Y")  # e.g., "February 22, 2026"
+            time_str = now.strftime("%I:%M %p")  # e.g., "12:41 AM"
+            
             planner = StudyPlanner()
             planner.sync_from_notion()
             suggestions = planner.analyze_schedule()
@@ -58,25 +67,37 @@ class AnalyzeStudyScheduleTool(Tool):
             # Build output
             output = []
             
+            # TIME CONTEXT (most important!)
+            output.append(f"🕐 CURRENT TIME: {day_name}, {date_str} at {time_str} (Myanmar Time)")
+            
             # Active courses summary
             active = [c for c in courses if c["status"] == "In Progress"]
             completed = [c for c in courses if c["status"] in ("Completed", "Complete")]
-            output.append(f"📊 COURSE STATUS: {len(active)} active, {len(completed)} completed")
-            output.append(f"Active courses: {', '.join(c['name'] for c in active)}")
+            output.append(f"📊 ACTIVE COURSES (2nd Quarter): {', '.join(c['name'] for c in active)}")
+            output.append(f"   ({len(completed)} first-quarter courses completed and filtered out)")
             
             # Study suggestions
-            if suggestions:
-                output.append(f"\n🎓 STUDY SCHEDULE ({len(suggestions)} items):")
-                for s in suggestions:
-                    today_marker = " ⭐TODAY" if s.get("is_today") else ""
+            today_items = [s for s in suggestions if s.get("is_today")]
+            upcoming_items = [s for s in suggestions if not s.get("is_today")]
+            
+            if today_items:
+                output.append(f"\n⭐ TODAY ({day_name}):")
+                for s in today_items:
                     urgency_icon = "🔴" if s.get("urgency") == "CRITICAL" else "🟡" if s.get("urgency") == "HIGH" else "🟢"
-                    output.append(f"\n{urgency_icon} [{s.get('urgency')}] {s.get('type')}: {s['course']}{today_marker}")
-                    output.append(f"  Due: {s['class_time']} ({s.get('days_until', '?')} days)")
+                    output.append(f"  {urgency_icon} {s.get('type')}: {s['course']}")
+                    output.append(f"     Time: {s['class_time']}")
                     if s["materials"]:
-                        output.append(f"  📚 {len(s['materials'])} study materials available")
-                    output.append(f"  💡 {s['reason']}")
+                        output.append(f"     📚 {len(s['materials'])} study materials available")
+                    output.append(f"     💡 {s['reason']}")
             else:
-                output.append("\n✅ No urgent deadlines or classes detected for active courses.")
+                output.append(f"\n✅ No classes or deadlines TODAY ({day_name}). You're free!")
+            
+            if upcoming_items:
+                output.append(f"\n📅 UPCOMING:")
+                for s in upcoming_items:
+                    urgency_icon = "🔴" if s.get("urgency") == "CRITICAL" else "🟡" if s.get("urgency") == "HIGH" else "🟢"
+                    output.append(f"  {urgency_icon} {s.get('type')}: {s['course']} (in {s.get('days_until')} days)")
+                    output.append(f"     💡 {s['reason']}")
             
             # Missing data report
             gaps = []
@@ -94,12 +115,13 @@ class AnalyzeStudyScheduleTool(Tool):
                     gaps.append(f"  ⚠️ {c['name']}: missing {', '.join(missing)}")
             
             if gaps:
-                output.append("\n📋 MISSING DATA (ask Tamer to fill these in Notion or tell you):")
+                output.append("\n📋 MISSING DATA (ask Tamer to fill these):")
                 output.extend(gaps)
             
             return "\n".join(output)
         except Exception as e:
             return f"Error analyzing study schedule: {e}"
+
 
 class IntrospectCoursesTool(Tool):
     @property

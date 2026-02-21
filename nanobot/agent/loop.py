@@ -456,27 +456,38 @@ class AgentLoop:
     async def _proactive_study_loop(self) -> None:
         """Loop that proactively analyzes study schedule and nudges the Tamer."""
         logger.info("Starting proactive study loop")
-        # Initial delay to avoid spamming at startup
         await asyncio.sleep(60)
         
         while self._running:
             try:
+                import datetime as dt
+                from zoneinfo import ZoneInfo
                 from nanobot.game.study_logic import StudyPlanner
+                
+                tz = ZoneInfo("Asia/Yangon")
+                now = dt.datetime.now(tz)
+                day_name = now.strftime("%A")
+                
                 planner = StudyPlanner()
                 suggestions = planner.analyze_schedule()
                 
-                if suggestions:
-                    # Pick the most imminent suggestion
-                    s = suggestions[0]
-                    
+                # Filter: only alert for real items (no test/dummy), and only if urgent
+                real_suggestions = [
+                    s for s in suggestions 
+                    if not any(skip in s.get("course", "").lower() for skip in ["test", "delete", "verify", "dummy"])
+                    and s.get("days_until", 999) <= 2  # Only alert for items within 2 days
+                ]
+                
+                if real_suggestions:
+                    s = real_suggestions[0]
                     urgency = s.get("urgency", "MEDIUM")
-                    alert_text = f"PROACTIVE STUDY ALERT: Tamer has an upcoming {s.get('type', 'task')}: '{s['course']}'"
+                    alert_text = f"PROACTIVE STUDY ALERT: Today is {day_name}. "
+                    alert_text += f"Tamer has an upcoming {s.get('type', 'task')}: '{s['course']}'"
                     alert_text += f" (urgency: {urgency}, due in {s.get('days_until', '?')} days)."
                     if s["materials"]:
                         alert_text += f" {len(s['materials'])} study materials are available."
                     alert_text += " Proactively warn them and suggest a study plan!"
                     
-                    # Use the same pattern as other proactive loops
                     sessions = self.sessions.list_sessions()
                     if sessions:
                         session_key = sessions[0].get("key", "")
@@ -497,6 +508,7 @@ class AgentLoop:
             except Exception as e:
                 logger.error(f"Error in proactive study loop: {e}")
                 await asyncio.sleep(300)
+
 
 
     async def _proactive_daily_scheduler_loop(self):
